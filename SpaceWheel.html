@@ -123,10 +123,9 @@ let startOrbitAngle = 0;
 const COLOR_PINK = '#ff007f';   
 const COLOR_CYAN = '#00f2fe';   
 const COLOR_YELLOW = '#ffcc00'; 
-const COLOR_GOLD = '#ffd700';
+const COLOR_GOLD = '#cc8800';
 const COLOR_RAINBOW = 'RAINBOW';
 const TYPE_DUAL_GAP = 'DUAL_GAP';
-const TYPE_TRIPLE_GAP = 'TRIPLE_GAP';
 const TYPE_BOMB = 'BOMB';
 
 const ITEM_STAR = 'STAR'; 
@@ -309,7 +308,8 @@ function update() {
         obs.y += currentSpeed * dt; 
 
         // --- HIER MUSS DER CODE REIN ---
-        if (obs.y > orbitY + sphereRadius && !obs.passed) {
+        let passedY = (obs.type === TYPE_BOMB) ? (orbitY + orbitRadius + sphereRadius) : (orbitY + sphereRadius);
+        if (obs.y > passedY && !obs.passed) {
             obs.passed = true;
             if (slowMotionBalkenCounter > 0) slowMotionBalkenCounter--;
             if (!obs.isAutoExploded) {
@@ -325,7 +325,10 @@ function update() {
         // --------------------------------
 
         // Danach folgt deine bestehende Kollisionslogik:
-        if (!obs.passed && obs.y + obs.height >= orbitY - sphereRadius && obs.y <= orbitY + sphereRadius) {
+        let inZone = (obs.type === TYPE_BOMB)
+            ? (() => { let bY = obs.y + obs.height / 2; return bY >= orbitY - orbitRadius - sphereRadius - 13 && bY <= orbitY + orbitRadius + sphereRadius + 13; })()
+            : (obs.y + obs.height >= orbitY - sphereRadius && obs.y <= orbitY + sphereRadius);
+        if (!obs.passed && inZone) {
             if (obs.isAutoExploded) {
                 obs.passed = true;
                 score += 1;
@@ -394,54 +397,14 @@ function update() {
                 }
                 // Kein Treffer: weiter prüfen auf dem nächsten Frame
                 continue;
-            } else if (obs.type === TYPE_TRIPLE_GAP) {
-                let coord1 = getTargetCoordinates(obs.color[0], pX, pY, cX, cY, yX, yY, bX, bY);
-                let coord2 = getTargetCoordinates(obs.color[1], pX, pY, cX, cY, yX, yY, bX, bY);
-                let coord3 = getTargetCoordinates(obs.color[2], pX, pY, cX, cY, yX, yY, bX, bY);
-
-                let ball1InGap = (coord1.x - sphereRadius >= obs.gapX && coord1.x + sphereRadius <= obs.gapX + obs.gapWidth);
-                let ball2InGap = (coord2.x - sphereRadius >= obs.gapX2 && coord2.x + sphereRadius <= obs.gapX2 + obs.gapWidth2);
-                let ball3InGap = (coord3.x - sphereRadius >= obs.gapX3 && coord3.x + sphereRadius <= obs.gapX3 + obs.gapWidth3);
-
-                if (ball1InGap && ball2InGap && ball3InGap) {
-                    success = true;
-                    closestDist = Math.min(
-                        getDistanceToGapEdges(coord1.x, obs.gapX, obs.gapWidth),
-                        getDistanceToGapEdges(coord2.x, obs.gapX2, obs.gapWidth2),
-                        getDistanceToGapEdges(coord3.x, obs.gapX3, obs.gapWidth3)
-                    );
-                } else {
-                    if (hasShield) {
-                        hasShield = false;
-                        obs.passed = true;
-                        if (slowMotionBalkenCounter > 0) slowMotionBalkenCounter--;
-                        createFloatingText("🛡️ Schild verloren!", orbitX, orbitY - 50);
-                        triggerJuiceEffect('#ffffff');
-                    } else {
-                        triggerGameOver();
-                        return;
-                    }
-                }
-} else if (obs.type === TYPE_DUAL_GAP) {
+            } else if (obs.type === TYPE_DUAL_GAP) {
     let coord1 = getTargetCoordinates(obs.color[0], pX, pY, cX, cY, yX, yY, bX, bY);
     let coord2 = getTargetCoordinates(obs.color[1], pX, pY, cX, cY, yX, yY, bX, bY);
 
     let ball1InGap = (coord1.x - sphereRadius + 1 >= obs.gapX && coord1.x + sphereRadius - 1 <= obs.gapX + obs.gapWidth);
     let ball2InGap = (coord2.x - sphereRadius + 1 >= obs.gapX2 && coord2.x + sphereRadius - 1 <= obs.gapX2 + obs.gapWidth2);
 
-    // Fremdfarbkugeln dürfen keine Lücke passieren
-    let allActiveBalls = [{color: COLOR_PINK, x: pX}];
-    if (score >= 12) allActiveBalls.push({color: COLOR_CYAN, x: cX});
-    if (score >= 51) allActiveBalls.push({color: COLOR_YELLOW, x: yX});
-    if (score >= 125) allActiveBalls.push({color: COLOR_GOLD, x: bX});
-    let nonTargetInGap = allActiveBalls
-        .filter(b => !obs.color.includes(b.color))
-        .some(b =>
-            (b.x - sphereRadius >= obs.gapX && b.x + sphereRadius <= obs.gapX + obs.gapWidth) ||
-            (b.x - sphereRadius >= obs.gapX2 && b.x + sphereRadius <= obs.gapX2 + obs.gapWidth2)
-        );
-
-    if (ball1InGap && ball2InGap && !nonTargetInGap) {
+    if (ball1InGap && ball2InGap) {
         success = true;
         closestDist = Math.min(getDistanceToGapEdges(coord1.x, obs.gapX, obs.gapWidth), getDistanceToGapEdges(coord2.x, obs.gapX2, obs.gapWidth2));
     } else {
@@ -601,7 +564,6 @@ function createObstacle() {
     let obstacleColor = COLOR_PINK;
     let obstacleType = 'NORMAL';
     let gapX2 = 0, gapWidth2 = 54; 
-    let gapX3 = 0, gapWidth3 = 88; 
 
     currentRequiredInterval = FIXED_INTERVAL;
 
@@ -616,23 +578,14 @@ function createObstacle() {
         while (attempts < 20) {
             let roll = Math.random();
             let chosen;
+            obstacleType = 'NORMAL';
 
             if (score >= 50 && roll < 0.07) {
                 obstacleType = TYPE_BOMB;
                 chosen = '#ff1100';
                 gapX = orbitX + (Math.random() * 80 - 40); 
             }
-            else if (score >= 90 && roll >= 0.07 && roll < 0.20 && score >= 100) { 
-                obstacleType = TYPE_TRIPLE_GAP;
-                chosen = Math.random() > 0.5 ? [COLOR_PINK, COLOR_YELLOW, COLOR_CYAN] : [COLOR_CYAN, COLOR_YELLOW, COLOR_PINK];
-                gapWidth = 88; gapWidth2 = 88; gapWidth3 = 88;
-                gapX = orbitX - orbitRadius - 32; gapX2 = orbitX - 44; gapX3 = orbitX + orbitRadius - 56;
-            } else if (score >= 90 && roll >= 0.07 && roll < 0.13) {
-                obstacleType = TYPE_TRIPLE_GAP;
-                chosen = Math.random() > 0.5 ? [COLOR_PINK, COLOR_YELLOW, COLOR_CYAN] : [COLOR_CYAN, COLOR_YELLOW, COLOR_PINK];
-                gapWidth = 88; gapWidth2 = 88; gapWidth3 = 88;
-                gapX = orbitX - orbitRadius - 32; gapX2 = orbitX - 44; gapX3 = orbitX + orbitRadius - 56;
-            } else if (score >= 41 && roll >= 0.20 && roll < 0.55) { 
+            else if (score >= 41 && roll >= 0.07 && roll < 0.55) {
                 let spawnDual = false;
                 if (score >= 100 && Math.random() < 0.65) spawnDual = true;       
                 else if (score >= 75 && Math.random() < 0.40) spawnDual = true;  
@@ -678,9 +631,7 @@ function createObstacle() {
         }
     }
 
-    if (obstacleType === TYPE_TRIPLE_GAP) {
-        currentRequiredInterval = FIXED_INTERVAL + 750; 
-    } else if (obstacleType === TYPE_DUAL_GAP) {
+    if (obstacleType === TYPE_DUAL_GAP) {
         currentRequiredInterval = FIXED_INTERVAL + 450; 
     } else if (obstacleType === TYPE_BOMB) {
         currentRequiredInterval = FIXED_INTERVAL + 300; 
@@ -719,7 +670,6 @@ function createObstacle() {
         color: obstacleColor, passed: false, type: obstacleType,
         isAutoExploded: autoPass,
         gapX2: gapX2, gapWidth2: gapWidth2,
-        gapX3: gapX3, gapWidth3: gapWidth3
     });
 }
 
@@ -888,11 +838,7 @@ function draw() {
         if (obs.passed || obs.isAutoExploded) {
             ctx.fillStyle = '#1a1a1e';
             ctx.fillRect(0, obs.y, obs.gapX, obs.height);
-            if (obs.type === TYPE_TRIPLE_GAP) {
-                ctx.fillRect(obs.gapX + obs.gapWidth, obs.y, obs.gapX2 - (obs.gapX + obs.gapWidth), obs.height);
-                ctx.fillRect(obs.gapX2 + obs.gapWidth2, obs.y, obs.gapX3 - (obs.gapX2 + obs.gapWidth2), obs.height);
-                ctx.fillRect(obs.gapX3 + obs.gapWidth3, obs.y, canvas.width - (obs.gapX3 + obs.gapWidth3), obs.height);
-            } else if (obs.type === TYPE_DUAL_GAP) {
+            if (obs.type === TYPE_DUAL_GAP) {
                 ctx.fillRect(obs.gapX + obs.gapWidth, obs.y, obs.gapX2 - (obs.gapX + obs.gapWidth), obs.height);
                 ctx.fillRect(obs.gapX2 + obs.gapWidth2, obs.y, canvas.width - (obs.gapX2 + obs.gapWidth2), obs.height);
             } else {
@@ -900,29 +846,12 @@ function draw() {
             }
             ctx.strokeStyle = '#2a2a30'; ctx.lineWidth = 1;
             ctx.strokeRect(0, obs.y, obs.gapX, obs.height);
-            if (obs.type === TYPE_TRIPLE_GAP) {
-                ctx.strokeRect(obs.gapX + obs.gapWidth, obs.y, obs.gapX2 - (obs.gapX + obs.gapWidth), obs.height);
-                ctx.strokeRect(obs.gapX2 + obs.gapWidth2, obs.y, obs.gapX3 - (obs.gapX2 + obs.gapWidth2), obs.height);
-                ctx.strokeRect(obs.gapX3 + obs.gapWidth3, obs.y, canvas.width - (obs.gapX3 + obs.gapWidth3), obs.height);
-            } else if (obs.type === TYPE_DUAL_GAP) {
+            if (obs.type === TYPE_DUAL_GAP) {
                 ctx.strokeRect(obs.gapX + obs.gapWidth, obs.y, obs.gapX2 - (obs.gapX + obs.gapWidth), obs.height);
                 ctx.strokeRect(obs.gapX2 + obs.gapWidth2, obs.y, canvas.width - (obs.gapX2 + obs.gapWidth2), obs.height);
             } else {
                 ctx.strokeRect(obs.gapX + obs.gapWidth, obs.y, canvas.width - (obs.gapX + obs.gapWidth), obs.height);
             }
-        } else if (obs.type === TYPE_TRIPLE_GAP) {
-            ctx.fillStyle = '#16161f';
-            ctx.fillRect(0, obs.y, obs.gapX, obs.height);
-            ctx.fillRect(obs.gapX + obs.gapWidth, obs.y, obs.gapX2 - (obs.gapX + obs.gapWidth), obs.height);
-            ctx.fillRect(obs.gapX2 + obs.gapWidth2, obs.y, obs.gapX3 - (obs.gapX2 + obs.gapWidth2), obs.height);
-            ctx.fillRect(obs.gapX3 + obs.gapWidth3, obs.y, canvas.width - (obs.gapX3 + obs.gapWidth3), obs.height);
-
-            ctx.lineWidth = 3;
-            ctx.strokeStyle = obs.color[0]; ctx.strokeRect(0, obs.y, obs.gapX, obs.height);
-            ctx.strokeStyle = obs.color[1]; ctx.strokeRect(obs.gapX + obs.gapWidth, obs.y, obs.gapX2 - (obs.gapX + obs.gapWidth), obs.height);
-            ctx.strokeStyle = obs.color[2]; ctx.strokeRect(obs.gapX2 + obs.gapWidth2, obs.y, obs.gapX3 - (obs.gapX2 + obs.gapWidth2), obs.height);
-            ctx.strokeStyle = '#ffffff'; ctx.strokeRect(obs.gapX3 + obs.gapWidth3, obs.y, canvas.width - (obs.gapX3 + obs.gapWidth3), obs.height);
-            
         } else if (obs.type === TYPE_DUAL_GAP) {
             ctx.fillStyle = '#16161f';
             ctx.fillRect(0, obs.y, obs.gapX, obs.height);
@@ -932,7 +861,7 @@ function draw() {
             ctx.lineWidth = 3;
             ctx.strokeStyle = obs.color[0];
             ctx.strokeRect(0, obs.y, obs.gapX, obs.height);
-            ctx.strokeStyle = '#ffffff'; 
+            ctx.strokeStyle = '#3a3a4a';
             ctx.strokeRect(obs.gapX + obs.gapWidth, obs.y, obs.gapX2 - (obs.gapX + obs.gapWidth), obs.height);
             ctx.strokeStyle = obs.color[1];
             ctx.strokeRect(obs.gapX2 + obs.gapWidth2, obs.y, canvas.width - (obs.gapX2 + obs.gapWidth2), obs.height);
