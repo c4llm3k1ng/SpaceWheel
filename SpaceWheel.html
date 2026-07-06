@@ -123,9 +123,10 @@ let startOrbitAngle = 0;
 const COLOR_PINK = '#ff007f';   
 const COLOR_CYAN = '#00f2fe';   
 const COLOR_YELLOW = '#ffcc00'; 
-const COLOR_GOLD = '#cc8800';
+const COLOR_PURPLE = '#aa00ff';
 const COLOR_RAINBOW = 'RAINBOW';
 const TYPE_DUAL_GAP = 'DUAL_GAP';
+const TYPE_TRIPLE_GAP = 'TRIPLE_GAP';
 const TYPE_BOMB = 'BOMB';
 
 const ITEM_STAR = 'STAR'; 
@@ -209,7 +210,7 @@ function resetGame() {
 
 function getLevelSettings(s) {
     if (s >= 125) {
-        return { speed: 490, name: "Stufe 9: Goldene Kugel aktiv 🌟", color: COLOR_GOLD };
+        return { speed: 490, name: "Stufe 9: Goldene Kugel aktiv 🌟", color: COLOR_PURPLE };
     } else if (s >= 90) {
         return { speed: 440, name: "Stufe 8: TRIPLE-GAPS freigeschaltet! 👥⚡", color: "#00ffcc" };
     } else if (s >= 72) {
@@ -397,6 +398,32 @@ function update() {
                 }
                 // Kein Treffer: weiter prüfen auf dem nächsten Frame
                 continue;
+            } else if (obs.type === TYPE_TRIPLE_GAP) {
+                let leftBallX = (cX < pX) ? cX : pX;
+                let rightBallX = (cX < pX) ? pX : cX;
+                let yellowInCenter = (yX - sphereRadius + 1 >= obs.gapX2 && yX + sphereRadius - 1 <= obs.gapX2 + obs.gapWidth2);
+                let leftInGap = (leftBallX - sphereRadius + 1 >= obs.gapX && leftBallX + sphereRadius - 1 <= obs.gapX + obs.gapWidth);
+                let rightInGap = (rightBallX - sphereRadius + 1 >= obs.gapX3 && rightBallX + sphereRadius - 1 <= obs.gapX3 + obs.gapWidth3);
+
+                if (yellowInCenter && leftInGap && rightInGap) {
+                    success = true;
+                    closestDist = Math.min(
+                        getDistanceToGapEdges(yX, obs.gapX2, obs.gapWidth2),
+                        getDistanceToGapEdges(leftBallX, obs.gapX, obs.gapWidth),
+                        getDistanceToGapEdges(rightBallX, obs.gapX3, obs.gapWidth3)
+                    );
+                } else {
+                    if (hasShield) {
+                        hasShield = false;
+                        obs.passed = true;
+                        if (slowMotionBalkenCounter > 0) slowMotionBalkenCounter--;
+                        createFloatingText("🛡️ Schild verloren!", orbitX, orbitY - 50);
+                        triggerJuiceEffect('#ffffff');
+                    } else {
+                        triggerGameOver();
+                        return;
+                    }
+                }
             } else if (obs.type === TYPE_DUAL_GAP) {
     let coord1 = getTargetCoordinates(obs.color[0], pX, pY, cX, cY, yX, yY, bX, bY);
     let coord2 = getTargetCoordinates(obs.color[1], pX, pY, cX, cY, yX, yY, bX, bY);
@@ -432,7 +459,7 @@ function update() {
                     if (obs.color.includes(COLOR_PINK)) targetBalls.push({x: pX});
                     if (obs.color.includes(COLOR_CYAN) && score >= 12) targetBalls.push({x: cX});
                     if (obs.color.includes(COLOR_YELLOW) && score >= 51) targetBalls.push({x: yX});
-                    if (obs.color.includes(COLOR_GOLD) && score >= 125) targetBalls.push({x: bX});
+                    if (obs.color.includes(COLOR_PURPLE) && score >= 125) targetBalls.push({x: bX});
                 } else {
                     let coord = getTargetCoordinates(obs.color, pX, pY, cX, cY, yX, yY, bX, bY);
                     targetBalls.push({x: coord.x});
@@ -563,13 +590,14 @@ function createObstacle() {
 
     let obstacleColor = COLOR_PINK;
     let obstacleType = 'NORMAL';
-    let gapX2 = 0, gapWidth2 = 54; 
+    let gapX2 = 0, gapWidth2 = 54;
+    let gapX3 = 0, gapWidth3 = 58;
 
     currentRequiredInterval = FIXED_INTERVAL;
 
     let pool = [COLOR_PINK, COLOR_CYAN];
     if (score >= 51) pool.push(COLOR_YELLOW);
-    if (score >= 125) pool.push(COLOR_GOLD); 
+    if (score >= 125) pool.push(COLOR_PURPLE); 
 
     if (score < 12) {
         obstacleColor = COLOR_PINK;
@@ -592,15 +620,24 @@ function createObstacle() {
                 else if (score < 75 && Math.random() < 0.20) spawnDual = true;   
 
                 if (spawnDual) {
+                    if (score >= 60 && Math.random() < 0.30) {
+                        obstacleType = TYPE_TRIPLE_GAP;
+                        chosen = [COLOR_CYAN, COLOR_YELLOW, COLOR_PINK];
+                        gapWidth = 58; gapWidth2 = 58; gapWidth3 = 58;
+                        gapX = orbitX - orbitRadius - 29;
+                        gapX2 = orbitX - 29;
+                        gapX3 = orbitX + orbitRadius - 29;
+                    } else {
                     obstacleType = TYPE_DUAL_GAP;
                     if (score >= 125 && Math.random() > 0.5) {
-                        chosen = Math.random() > 0.5 ? [COLOR_YELLOW, COLOR_GOLD] : [COLOR_GOLD, COLOR_YELLOW];
+                        chosen = Math.random() > 0.5 ? [COLOR_YELLOW, COLOR_PURPLE] : [COLOR_PURPLE, COLOR_YELLOW];
                     } else {
                         chosen = Math.random() > 0.5 ? [COLOR_PINK, COLOR_CYAN] : [COLOR_CYAN, COLOR_PINK];
                     }
                     gapWidth = 58; gapWidth2 = 58;
                     gapX = orbitX - orbitRadius - (gapWidth / 2);
                     gapX2 = orbitX + orbitRadius - (gapWidth2 / 2);
+                    }
                 } else {
                     chosen = pool[Math.floor(Math.random() * pool.length)];
                 }
@@ -632,9 +669,11 @@ function createObstacle() {
     }
 
     if (obstacleType === TYPE_DUAL_GAP) {
-        currentRequiredInterval = FIXED_INTERVAL + 450; 
+        currentRequiredInterval = FIXED_INTERVAL + 450;
+    } else if (obstacleType === TYPE_TRIPLE_GAP) {
+        currentRequiredInterval = FIXED_INTERVAL + 750;
     } else if (obstacleType === TYPE_BOMB) {
-        currentRequiredInterval = FIXED_INTERVAL + 300; 
+        currentRequiredInterval = FIXED_INTERVAL + 300;
     }
 
     // --- ITEM SPAWN SYSTEM ---
@@ -670,6 +709,7 @@ function createObstacle() {
         color: obstacleColor, passed: false, type: obstacleType,
         isAutoExploded: autoPass,
         gapX2: gapX2, gapWidth2: gapWidth2,
+        gapX3: gapX3, gapWidth3: gapWidth3,
     });
 }
 
@@ -838,7 +878,11 @@ function draw() {
         if (obs.passed || obs.isAutoExploded) {
             ctx.fillStyle = '#1a1a1e';
             ctx.fillRect(0, obs.y, obs.gapX, obs.height);
-            if (obs.type === TYPE_DUAL_GAP) {
+            if (obs.type === TYPE_TRIPLE_GAP) {
+                ctx.fillRect(obs.gapX + obs.gapWidth, obs.y, obs.gapX2 - (obs.gapX + obs.gapWidth), obs.height);
+                ctx.fillRect(obs.gapX2 + obs.gapWidth2, obs.y, obs.gapX3 - (obs.gapX2 + obs.gapWidth2), obs.height);
+                ctx.fillRect(obs.gapX3 + obs.gapWidth3, obs.y, canvas.width - (obs.gapX3 + obs.gapWidth3), obs.height);
+            } else if (obs.type === TYPE_DUAL_GAP) {
                 ctx.fillRect(obs.gapX + obs.gapWidth, obs.y, obs.gapX2 - (obs.gapX + obs.gapWidth), obs.height);
                 ctx.fillRect(obs.gapX2 + obs.gapWidth2, obs.y, canvas.width - (obs.gapX2 + obs.gapWidth2), obs.height);
             } else {
@@ -846,12 +890,31 @@ function draw() {
             }
             ctx.strokeStyle = '#2a2a30'; ctx.lineWidth = 1;
             ctx.strokeRect(0, obs.y, obs.gapX, obs.height);
-            if (obs.type === TYPE_DUAL_GAP) {
+            if (obs.type === TYPE_TRIPLE_GAP) {
+                ctx.strokeRect(obs.gapX + obs.gapWidth, obs.y, obs.gapX2 - (obs.gapX + obs.gapWidth), obs.height);
+                ctx.strokeRect(obs.gapX2 + obs.gapWidth2, obs.y, obs.gapX3 - (obs.gapX2 + obs.gapWidth2), obs.height);
+                ctx.strokeRect(obs.gapX3 + obs.gapWidth3, obs.y, canvas.width - (obs.gapX3 + obs.gapWidth3), obs.height);
+            } else if (obs.type === TYPE_DUAL_GAP) {
                 ctx.strokeRect(obs.gapX + obs.gapWidth, obs.y, obs.gapX2 - (obs.gapX + obs.gapWidth), obs.height);
                 ctx.strokeRect(obs.gapX2 + obs.gapWidth2, obs.y, canvas.width - (obs.gapX2 + obs.gapWidth2), obs.height);
             } else {
                 ctx.strokeRect(obs.gapX + obs.gapWidth, obs.y, canvas.width - (obs.gapX + obs.gapWidth), obs.height);
             }
+        } else if (obs.type === TYPE_TRIPLE_GAP) {
+            ctx.fillStyle = '#16161f';
+            ctx.fillRect(0, obs.y, obs.gapX, obs.height);
+            ctx.fillRect(obs.gapX + obs.gapWidth, obs.y, obs.gapX2 - (obs.gapX + obs.gapWidth), obs.height);
+            ctx.fillRect(obs.gapX2 + obs.gapWidth2, obs.y, obs.gapX3 - (obs.gapX2 + obs.gapWidth2), obs.height);
+            ctx.fillRect(obs.gapX3 + obs.gapWidth3, obs.y, canvas.width - (obs.gapX3 + obs.gapWidth3), obs.height);
+
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = obs.color[0];
+            ctx.strokeRect(0, obs.y, obs.gapX, obs.height);
+            ctx.strokeStyle = '#3a3a4a';
+            ctx.strokeRect(obs.gapX + obs.gapWidth, obs.y, obs.gapX2 - (obs.gapX + obs.gapWidth), obs.height);
+            ctx.strokeRect(obs.gapX2 + obs.gapWidth2, obs.y, obs.gapX3 - (obs.gapX2 + obs.gapWidth2), obs.height);
+            ctx.strokeStyle = obs.color[2];
+            ctx.strokeRect(obs.gapX3 + obs.gapWidth3, obs.y, canvas.width - (obs.gapX3 + obs.gapWidth3), obs.height);
         } else if (obs.type === TYPE_DUAL_GAP) {
             ctx.fillStyle = '#16161f';
             ctx.fillRect(0, obs.y, obs.gapX, obs.height);
@@ -912,7 +975,7 @@ function draw() {
         let blink = (starPowerBalkenCounter > 0) ? (Math.sin(Date.now() / 80) * 0.4 + 0.6) : 1.0;
         ctx.globalAlpha = blink;
 
-        let fillPink = COLOR_PINK, fillCyan = COLOR_CYAN, fillYellow = COLOR_YELLOW, fillGold = COLOR_GOLD;
+        let fillPink = COLOR_PINK, fillCyan = COLOR_CYAN, fillYellow = COLOR_YELLOW, fillPurple = COLOR_PURPLE;
 
         ctx.beginPath(); ctx.arc(pX, pY, sphereRadius, 0, Math.PI * 2);
         ctx.fillStyle = fillPink; ctx.shadowBlur = (starPowerBalkenCounter > 0) ? 20 : 10; ctx.shadowColor = fillPink; ctx.fill();
@@ -926,8 +989,8 @@ function draw() {
         ctx.shadowColor = fillYellow; ctx.fill();
 
         ctx.beginPath(); ctx.arc(bX, bY, sphereRadius, 0, Math.PI * 2);
-        ctx.fillStyle = (score >= 125 || starPowerBalkenCounter > 0) ? fillGold : 'rgba(255,255,255,0.01)';
-        ctx.shadowColor = fillGold; ctx.fill();
+        ctx.fillStyle = (score >= 125 || starPowerBalkenCounter > 0) ? fillPurple : 'rgba(255,255,255,0.01)';
+        ctx.shadowColor = fillPurple; ctx.fill();
         
         ctx.globalAlpha = 1.0; // WICHTIG: Hier setzen wir Alpha zurück
         ctx.shadowBlur = 0; 
