@@ -1,6 +1,5 @@
-const CACHE = 'orbit-sync-v1';
-const ASSETS = [
-    './SpaceWheel.html',
+const CACHE = 'orbit-sync-v2';
+const STATIC_ASSETS = [
     './manifest.json',
     './icon-192.png',
     './icon-512.png',
@@ -8,7 +7,7 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', e => {
-    e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+    e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC_ASSETS)));
     self.skipWaiting();
 });
 
@@ -22,6 +21,22 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+    const url = new URL(e.request.url);
+
+    // Network-first für die Haupt-HTML: immer frische Version laden
+    if (url.pathname.endsWith('SpaceWheel.html') || url.pathname.endsWith('/SpaceWheel/')) {
+        e.respondWith(
+            fetch(e.request)
+                .then(response => {
+                    caches.open(CACHE).then(c => c.put(e.request, response.clone()));
+                    return response;
+                })
+                .catch(() => caches.match(e.request))
+        );
+        return;
+    }
+
+    // Cache-first für Icons und Manifest (ändern sich selten)
     e.respondWith(
         caches.match(e.request).then(r => r || fetch(e.request))
     );
