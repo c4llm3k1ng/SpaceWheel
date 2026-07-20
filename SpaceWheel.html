@@ -309,7 +309,7 @@ function update() {
         obs.y += currentSpeed * dt; 
 
         // --- HIER MUSS DER CODE REIN ---
-        let passedY = (obs.type === TYPE_BOMB) ? (orbitY + orbitRadius + sphereRadius) : (orbitY + sphereRadius);
+        let passedY = orbitY + orbitRadius + sphereRadius;
         if (obs.y > passedY && !obs.passed) {
             obs.passed = true;
             if (slowMotionBalkenCounter > 0) slowMotionBalkenCounter--;
@@ -326,9 +326,17 @@ function update() {
         // --------------------------------
 
         // Danach folgt deine bestehende Kollisionslogik:
-        let inZone = (obs.type === TYPE_BOMB)
-            ? (() => { let bY = obs.y + obs.height / 2; return bY >= orbitY - orbitRadius - sphereRadius - 13 && bY <= orbitY + orbitRadius + sphereRadius + 13; })()
-            : (obs.y + obs.height >= orbitY - sphereRadius && obs.y <= orbitY + sphereRadius);
+        let inZone;
+        if (obs.type === TYPE_BOMB) {
+            let bY = obs.y + obs.height / 2;
+            inZone = bY >= orbitY - orbitRadius - sphereRadius - 13 && bY <= orbitY + orbitRadius + sphereRadius + 13;
+        } else if (obs.type === TYPE_TRIPLE_GAP) {
+            // Schmale Zone: TRIPLE_GAP prüft nur X-Positionen am orbitY-Niveau
+            inZone = (obs.y + obs.height >= orbitY - sphereRadius && obs.y <= orbitY + sphereRadius);
+        } else {
+            // Breite Zone: deckt alle möglichen Kugel-Y-Positionen ab (mit per-Kugel-Check innen)
+            inZone = (obs.y + obs.height >= orbitY - orbitRadius - sphereRadius && obs.y <= orbitY + orbitRadius + sphereRadius);
+        }
         if (!obs.passed && inZone) {
             if (obs.isAutoExploded) {
                 obs.passed = true;
@@ -425,47 +433,58 @@ function update() {
                     }
                 }
             } else if (obs.type === TYPE_DUAL_GAP) {
-    let coord1 = getTargetCoordinates(obs.color[0], pX, pY, cX, cY, yX, yY, bX, bY);
-    let coord2 = getTargetCoordinates(obs.color[1], pX, pY, cX, cY, yX, yY, bX, bY);
+                let coord1 = getTargetCoordinates(obs.color[0], pX, pY, cX, cY, yX, yY, bX, bY);
+                let coord2 = getTargetCoordinates(obs.color[1], pX, pY, cX, cY, yX, yY, bX, bY);
 
-    let ball1InGap = (coord1.x - sphereRadius + 1 >= obs.gapX && coord1.x + sphereRadius - 1 <= obs.gapX + obs.gapWidth);
-    let ball2InGap = (coord2.x - sphereRadius + 1 >= obs.gapX2 && coord2.x + sphereRadius - 1 <= obs.gapX2 + obs.gapWidth2);
+                let bar1AtY = (obs.y + obs.height >= coord1.y - sphereRadius && obs.y <= coord1.y + sphereRadius);
+                let bar2AtY = (obs.y + obs.height >= coord2.y - sphereRadius && obs.y <= coord2.y + sphereRadius);
 
-    if (ball1InGap && ball2InGap) {
-        success = true;
-        closestDist = Math.min(getDistanceToGapEdges(coord1.x, obs.gapX, obs.gapWidth), getDistanceToGapEdges(coord2.x, obs.gapX2, obs.gapWidth2));
-    } else {
-        if (hasShield) {
-            hasShield = false;
-            obs.passed = true;
-            if (slowMotionBalkenCounter > 0) slowMotionBalkenCounter--;
-            createFloatingText("🛡️ Schild verloren!", orbitX, orbitY - 50);
-            triggerJuiceEffect('#ffffff');
-        } else {
-            triggerGameOver();
-            return;
-        }
-    }
+                if (bar1AtY || bar2AtY) {
+                    let ball1InGap = (coord1.x - sphereRadius + 1 >= obs.gapX && coord1.x + sphereRadius - 1 <= obs.gapX + obs.gapWidth);
+                    let ball2InGap = (coord2.x - sphereRadius + 1 >= obs.gapX2 && coord2.x + sphereRadius - 1 <= obs.gapX2 + obs.gapWidth2);
+
+                    let anyFail = (bar1AtY && !ball1InGap) || (bar2AtY && !ball2InGap);
+                    let bothSuccess = bar1AtY && bar2AtY && ball1InGap && ball2InGap;
+
+                    if (bothSuccess) {
+                        success = true;
+                        closestDist = Math.min(getDistanceToGapEdges(coord1.x, obs.gapX, obs.gapWidth), getDistanceToGapEdges(coord2.x, obs.gapX2, obs.gapWidth2));
+                    } else if (anyFail) {
+                        if (hasShield) {
+                            hasShield = false;
+                            obs.passed = true;
+                            if (slowMotionBalkenCounter > 0) slowMotionBalkenCounter--;
+                            createFloatingText("🛡️ Schild verloren!", orbitX, orbitY - 50);
+                            triggerJuiceEffect('#ffffff');
+                        } else {
+                            triggerGameOver();
+                            return;
+                        }
+                    }
+                }
             } else {
                 // Nur die Kugeln, deren Farbe zum Balken passt, sind relevant.
-                // Alle anderen Kugeln haben keinen Einfluss auf Erfolg oder Game Over.
                 let targetBalls = [];
                 if (obs.color === COLOR_RAINBOW) {
-                    targetBalls.push({x: pX});
-                    if (score >= 12) targetBalls.push({x: cX});
-                    if (score >= 51) targetBalls.push({x: yX});
-                    if (score >= 125) targetBalls.push({x: bX});
+                    targetBalls.push({x: pX, y: pY});
+                    if (score >= 12) targetBalls.push({x: cX, y: cY});
+                    if (score >= 51) targetBalls.push({x: yX, y: yY});
+                    if (score >= 125) targetBalls.push({x: bX, y: bY});
                 } else if (Array.isArray(obs.color)) {
-                    if (obs.color.includes(COLOR_PINK)) targetBalls.push({x: pX});
-                    if (obs.color.includes(COLOR_CYAN) && score >= 12) targetBalls.push({x: cX});
-                    if (obs.color.includes(COLOR_YELLOW) && score >= 51) targetBalls.push({x: yX});
-                    if (obs.color.includes(COLOR_PURPLE) && score >= 125) targetBalls.push({x: bX});
+                    if (obs.color.includes(COLOR_PINK)) targetBalls.push({x: pX, y: pY});
+                    if (obs.color.includes(COLOR_CYAN) && score >= 12) targetBalls.push({x: cX, y: cY});
+                    if (obs.color.includes(COLOR_YELLOW) && score >= 51) targetBalls.push({x: yX, y: yY});
+                    if (obs.color.includes(COLOR_PURPLE) && score >= 125) targetBalls.push({x: bX, y: bY});
                 } else {
-                    let coord = getTargetCoordinates(obs.color, pX, pY, cX, cY, yX, yY, bX, bY);
-                    targetBalls.push({x: coord.x});
+                    targetBalls.push(getTargetCoordinates(obs.color, pX, pY, cX, cY, yX, yY, bX, bY));
                 }
 
+                let anyBallReached = false;
                 for (let ball of targetBalls) {
+                    // Nur prüfen wenn der Balken die tatsächliche Y-Position dieser Kugel erreicht hat
+                    let barAtBallY = (obs.y + obs.height >= ball.y - sphereRadius && obs.y <= ball.y + sphereRadius);
+                    if (!barAtBallY) continue;
+                    anyBallReached = true;
                     let inGap = (ball.x - sphereRadius + 1 >= obs.gapX && ball.x + sphereRadius - 1 <= obs.gapX + obs.gapWidth);
                     if (inGap) {
                         success = true;
@@ -473,8 +492,8 @@ function update() {
                     }
                 }
 
-                // Schild-Logik:
-                if (!success && starPowerBalkenCounter <= 0) {
+                // Schild-Logik: nur auslösen wenn der Balken wirklich bei der Kugel angekommen ist
+                if (!success && anyBallReached && starPowerBalkenCounter <= 0) {
                     if (hasShield) {
                         hasShield = false;
                         obs.passed = true;
@@ -486,7 +505,7 @@ function update() {
                         return;
                     }
                 }
-            } // <--- Das schließt den 'else'-Block, der bei "else {" (Zeile 394 in deinem Snippet) begann
+            } // <--- Das schließt den 'else'-Block
 
             if (success) {
                 obs.passed = true;
