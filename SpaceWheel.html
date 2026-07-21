@@ -173,7 +173,7 @@
             <div class="add-friend-title">Freund hinzufügen</div>
             <input class="add-friend-input" id="add-friend-input" type="text" placeholder="Nutzername oder Freundescode" />
             <div class="add-friend-hint">Gib den Nutzernamen oder den 6-stelligen Freundescode ein</div>
-            <button class="auth-btn" onclick="handleAddFriend()">Hinzufügen</button>
+            <button class="auth-btn" onclick="handleAddFriend()">Anfrage senden</button>
             <div class="auth-error" id="add-friend-error"></div>
             <button class="auth-guest-btn" onclick="closeAddFriend()">Abbrechen</button>
         </div>
@@ -370,8 +370,17 @@ function update() {
     }
 
     if (starPowerTimer > 0) {
-        levelEl.innerText = "🌟 STAR IMMUNITY AKTIV";
+        levelEl.innerText = `🌟 IMMUNITY ${Math.ceil(starPowerTimer)}s`;
         levelEl.style.color = '#ffcc00';
+    } else if (slowMotionTimer > 0) {
+        levelEl.innerText = `⏳ ZEITLUPE ${Math.ceil(slowMotionTimer)}s`;
+        levelEl.style.color = '#00f2fe';
+    } else if (clearTimer > 0) {
+        levelEl.innerText = `💥 SPRENGUNG ${Math.ceil(clearTimer)}s`;
+        levelEl.style.color = '#ff3300';
+    } else if (wideGapTimer > 0) {
+        levelEl.innerText = `↔ BREITE LÜCKEN ${Math.ceil(wideGapTimer)}s`;
+        levelEl.style.color = '#aa00ff';
     } else {
         levelEl.innerText = settings.name;
         levelEl.style.color = settings.color;
@@ -1272,11 +1281,11 @@ async function registerUser(username, password) {
         if (!(await fbDb.collection('friendCodes').doc(friendCode).get()).exists) break;
     }
     const batch = fbDb.batch();
-    batch.set(fbDb.collection('users').doc(uid), { username, friendCode, highscore: 0, friends: [] });
+    batch.set(fbDb.collection('users').doc(uid), { username, friendCode, highscore: 0, friends: [], pendingRequests: [] });
     batch.set(fbDb.collection('usernames').doc(username.toLowerCase()), { uid });
     batch.set(fbDb.collection('friendCodes').doc(friendCode), { uid });
     await batch.commit();
-    fbUserData = { username, friendCode, highscore: 0, friends: [] };
+    fbUserData = { username, friendCode, highscore: 0, friends: [], pendingRequests: [] };
 }
 
 async function loginUser(username, password) {
@@ -1344,6 +1353,8 @@ async function renderLeaderboard(tab) {
     listEl.innerHTML = '<div style="text-align:center;color:#555;padding:40px;">Laden...</div>';
     try {
         let rows = [];
+        let pendingHtml = '';
+
         if (tab === 'global') {
             const snap = await fbDb.collection('users').orderBy('highscore','desc').limit(50).get();
             rows = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
@@ -1352,6 +1363,32 @@ async function renderLeaderboard(tab) {
                 listEl.innerHTML = '<div style="text-align:center;color:#555;padding:40px;">Melde dich an, um Freunde zu sehen</div>';
                 return;
             }
+
+            // Pending friend requests
+            const pendingUids = fbUserData?.pendingRequests || [];
+            if (pendingUids.length > 0) {
+                const pendingUsers = [];
+                for (let i = 0; i < pendingUids.length; i += 10) {
+                    const chunk = pendingUids.slice(i, i+10);
+                    const snap = await fbDb.collection('users')
+                        .where(firebase.firestore.FieldPath.documentId(), 'in', chunk).get();
+                    snap.docs.forEach(d => pendingUsers.push({ uid: d.id, ...d.data() }));
+                }
+                if (pendingUsers.length > 0) {
+                    pendingHtml = `<div style="margin-bottom:16px;">
+                        <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;padding:0 4px;">Anfragen (${pendingUsers.length})</div>
+                        ${pendingUsers.map(u => `<div class="lb-row" style="justify-content:space-between;">
+                            <div class="lb-name" style="flex:1;">${escapeHtml(u.username||'?')}</div>
+                            <div style="display:flex;gap:8px;">
+                                <button onclick="acceptAndRefresh('${u.uid}')" style="padding:5px 14px;background:#ff007f;border:none;border-radius:6px;color:#fff;font-size:13px;cursor:pointer;font-weight:bold;">✓</button>
+                                <button onclick="declineAndRefresh('${u.uid}')" style="padding:5px 14px;background:#2a2b3d;border:none;border-radius:6px;color:#888;font-size:13px;cursor:pointer;">✕</button>
+                            </div>
+                        </div>`).join('')}
+                    </div>
+                    <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;padding:0 4px;">Freunde</div>`;
+                }
+            }
+
             const allUids = [fbUser.uid, ...(fbUserData?.friends || [])];
             const results = [];
             for (let i = 0; i < allUids.length; i += 10) {
@@ -1362,12 +1399,9 @@ async function renderLeaderboard(tab) {
             }
             rows = results.sort((a,b) => (b.highscore||0) - (a.highscore||0));
         }
-        if (!rows.length) {
-            listEl.innerHTML = '<div style="text-align:center;color:#555;padding:40px;">Noch keine Einträge</div>';
-            return;
-        }
+
         const medals = ['🥇','🥈','🥉'];
-        listEl.innerHTML = rows.map((r,i) => {
+        const rowsHtml = rows.length ? rows.map((r,i) => {
             const isMe = fbUser && r.uid === fbUser.uid;
             const rank = medals[i] || `#${i+1}`;
             return `<div class="lb-row${isMe?' me':''}">
@@ -1375,7 +1409,9 @@ async function renderLeaderboard(tab) {
                 <div class="lb-name">${escapeHtml(r.username||'?')}${isMe?' <span style="color:#ff007f;font-size:11px;">(du)</span>':''}</div>
                 <div class="lb-score">${r.highscore||0}</div>
             </div>`;
-        }).join('');
+        }).join('') : (tab === 'friends' ? '<div style="text-align:center;color:#555;padding:20px;">Noch keine Freunde</div>' : '<div style="text-align:center;color:#555;padding:40px;">Noch keine Einträge</div>');
+
+        listEl.innerHTML = pendingHtml + rowsHtml;
     } catch(e) {
         listEl.innerHTML = '<div style="text-align:center;color:#ff5555;padding:40px;">Fehler beim Laden</div>';
     }
@@ -1391,10 +1427,45 @@ function closeAddFriend() {
     document.getElementById('add-friend-screen').classList.remove('active');
 }
 
+async function acceptFriendRequest(requestorUid) {
+    // Write to requestor's doc FIRST (while requestor is still in our pendingRequests — required by security rule)
+    await fbDb.collection('users').doc(requestorUid).update({
+        friends: firebase.firestore.FieldValue.arrayUnion(fbUser.uid)
+    });
+    // Then update own doc
+    await fbDb.collection('users').doc(fbUser.uid).update({
+        friends: firebase.firestore.FieldValue.arrayUnion(requestorUid),
+        pendingRequests: firebase.firestore.FieldValue.arrayRemove(requestorUid)
+    });
+    if (!fbUserData.friends) fbUserData.friends = [];
+    if (!fbUserData.friends.includes(requestorUid)) fbUserData.friends.push(requestorUid);
+    if (fbUserData.pendingRequests)
+        fbUserData.pendingRequests = fbUserData.pendingRequests.filter(id => id !== requestorUid);
+}
+
+async function declineFriendRequest(requestorUid) {
+    await fbDb.collection('users').doc(fbUser.uid).update({
+        pendingRequests: firebase.firestore.FieldValue.arrayRemove(requestorUid)
+    });
+    if (fbUserData.pendingRequests)
+        fbUserData.pendingRequests = fbUserData.pendingRequests.filter(id => id !== requestorUid);
+}
+
+async function acceptAndRefresh(uid) {
+    try { await acceptFriendRequest(uid); } catch(e) { console.error(e); }
+    await renderLeaderboard('friends');
+}
+
+async function declineAndRefresh(uid) {
+    try { await declineFriendRequest(uid); } catch(e) { console.error(e); }
+    await renderLeaderboard('friends');
+}
+
 async function handleAddFriend() {
     const input = document.getElementById('add-friend-input').value.trim();
     const errEl = document.getElementById('add-friend-error');
     errEl.textContent = '';
+    errEl.style.color = '#ff3366';
     if (!input) { errEl.textContent = 'Bitte Code oder Nutzernamen eingeben'; return; }
     try {
         let targetUid = null;
@@ -1408,14 +1479,31 @@ async function handleAddFriend() {
         if (!targetUid) throw new Error('Nicht gefunden');
         if (targetUid === fbUser.uid) throw new Error('Du kannst dich nicht selbst hinzufügen');
         if ((fbUserData.friends||[]).includes(targetUid)) throw new Error('Bereits in deiner Freundesliste');
-        await fbDb.collection('users').doc(fbUser.uid).update({
-            friends: firebase.firestore.FieldValue.arrayUnion(targetUid)
+
+        // Cross-request: they already sent us a request → auto-accept
+        if ((fbUserData.pendingRequests||[]).includes(targetUid)) {
+            await acceptFriendRequest(targetUid);
+            errEl.style.color = '#00d68f';
+            errEl.textContent = 'Freund hinzugefügt!';
+            setTimeout(async () => { closeAddFriend(); await renderLeaderboard('friends'); }, 1500);
+            return;
+        }
+
+        // Check if we already sent a request
+        const targetDoc = await fbDb.collection('users').doc(targetUid).get();
+        if (!targetDoc.exists) throw new Error('Nicht gefunden');
+        if ((targetDoc.data().pendingRequests||[]).includes(fbUser.uid))
+            throw new Error('Anfrage bereits gesendet');
+
+        // Send request: add our uid to their pendingRequests
+        await fbDb.collection('users').doc(targetUid).update({
+            pendingRequests: firebase.firestore.FieldValue.arrayUnion(fbUser.uid)
         });
-        if (!fbUserData.friends) fbUserData.friends = [];
-        fbUserData.friends.push(targetUid);
-        closeAddFriend();
-        await renderLeaderboard('friends');
+        errEl.style.color = '#00d68f';
+        errEl.textContent = 'Anfrage gesendet!';
+        setTimeout(closeAddFriend, 1500);
     } catch(e) {
+        errEl.style.color = '#ff3366';
         errEl.textContent = e.message;
     }
 }
