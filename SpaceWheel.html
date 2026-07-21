@@ -218,10 +218,10 @@ let currentRequiredInterval = FIXED_INTERVAL;
 let lastPattern = -1; 
 
 // Buff / Item Zustände
-let slowMotionBalkenCounter = 0; 
+let slowMotionTimer = 0;
 let hasShield = false;
-let clearChargeCounter = 0; 
-let starPowerBalkenCounter = 0; 
+let clearTimer = 0;
+let starPowerTimer = 0; 
 let itemCooldownBalken = 0;
 let wideGapTimer = 0;
 
@@ -311,10 +311,10 @@ function resetGame() {
     orbitAngle = 0; 
     targetOrbitAngle = 0;
     spawnTimer = 9999; 
-    slowMotionBalkenCounter = 0;
+    slowMotionTimer = 0;
     hasShield = false;
-    clearChargeCounter = 0;
-    starPowerBalkenCounter = 0;
+    clearTimer = 0;
+    starPowerTimer = 0;
     itemCooldownBalken = 0;
     wideGapTimer = 0;
     currentRequiredInterval = FIXED_INTERVAL;
@@ -359,18 +359,19 @@ function update() {
     const settings = getLevelSettings(score);
 
     let currentSpeed = settings.speed;
+    const prevStarPower = starPowerTimer;
+    if (starPowerTimer > 0) starPowerTimer = Math.max(0, starPowerTimer - dt);
+    if (slowMotionTimer > 0) slowMotionTimer = Math.max(0, slowMotionTimer - dt);
+    if (clearTimer > 0) clearTimer = Math.max(0, clearTimer - dt);
     if (wideGapTimer > 0) wideGapTimer = Math.max(0, wideGapTimer - dt);
+    if (prevStarPower > 0 && starPowerTimer === 0) {
+        currentRequiredInterval = FIXED_INTERVAL + 1200;
+        spawnTimer = 0;
+    }
 
-    if (starPowerBalkenCounter > 0) {
-        levelEl.innerText = "🌟 STAR IMMUNITY AKTIV (" + starPowerBalkenCounter + " Balken)";
+    if (starPowerTimer > 0) {
+        levelEl.innerText = "🌟 STAR IMMUNITY AKTIV";
         levelEl.style.color = '#ffcc00';
-    } else if (slowMotionBalkenCounter > 0) {
-        currentSpeed *= 0.5;
-        levelEl.innerText = "⏳ ZEITLUPE AKTIV (" + slowMotionBalkenCounter + " Balken)";
-        levelEl.style.color = '#00f2fe';
-    } else if (wideGapTimer > 0) {
-        levelEl.innerText = "↔ BREITE LÜCKEN AKTIV (" + Math.ceil(wideGapTimer) + "s)";
-        levelEl.style.color = '#aa00ff';
     } else {
         levelEl.innerText = settings.name;
         levelEl.style.color = settings.color;
@@ -397,8 +398,8 @@ function update() {
     const bY = orbitY + Math.sin(orbitAngle + Math.PI * 1.5) * orbitRadius;
 
     let timerProgress = dt * 1000;
-    if (slowMotionBalkenCounter > 0 && starPowerBalkenCounter <= 0) {
-        timerProgress *= 0.5; 
+    if (slowMotionTimer > 0 && starPowerTimer <= 0) {
+        timerProgress *= 0.5;
     }
     spawnTimer += timerProgress;
 
@@ -435,7 +436,6 @@ function update() {
         let passedY = orbitY + orbitRadius + sphereRadius;
         if (obs.y > passedY && !obs.passed) {
             obs.passed = true;
-            if (slowMotionBalkenCounter > 0) slowMotionBalkenCounter--;
             if (!obs.isAutoExploded) {
                 score += 1;
                 scoreEl.innerText = score;
@@ -469,12 +469,7 @@ function update() {
                 continue;
             }
 
-            if (starPowerBalkenCounter > 0) {
-                starPowerBalkenCounter--; 
-                if (starPowerBalkenCounter === 0) {
-                    currentRequiredInterval = FIXED_INTERVAL + 1200; 
-                    spawnTimer = 0; 
-                }
+            if (starPowerTimer > 0) {
                 obs.passed = true;
                 score += 1;
                 scoreEl.innerText = score;
@@ -509,7 +504,6 @@ function update() {
                     if (hasShield) {
                         hasShield = false;
                         obs.passed = true;
-                        if (slowMotionBalkenCounter > 0) slowMotionBalkenCounter--;
                         createFloatingText("🛡️ Schild verloren!", orbitX, orbitY - 50);
                         triggerJuiceEffect('#ffffff');
                     } else {
@@ -550,7 +544,6 @@ function update() {
                     if (hasShield) {
                         hasShield = false;
                         obs.passed = true;
-                        if (slowMotionBalkenCounter > 0) slowMotionBalkenCounter--;
                         createFloatingText("🛡️ Schild verloren!", orbitX, orbitY - 50);
                         triggerJuiceEffect('#ffffff');
                     } else {
@@ -585,7 +578,6 @@ function update() {
                     if (hasShield) {
                         hasShield = false;
                         obs.passed = true;
-                        if (slowMotionBalkenCounter > 0) slowMotionBalkenCounter--;
                         createFloatingText("🛡️ Schild verloren!", orbitX, orbitY - 50);
                         triggerJuiceEffect('#ffffff');
                     } else {
@@ -625,11 +617,10 @@ function update() {
                 }
 
                 // Schild-Logik: nur auslösen wenn der Balken wirklich bei der Kugel angekommen ist
-                if (!success && anyBallReached && starPowerBalkenCounter <= 0) {
+                if (!success && anyBallReached && starPowerTimer <= 0) {
                     if (hasShield) {
                         hasShield = false;
                         obs.passed = true;
-                        if (slowMotionBalkenCounter > 0) slowMotionBalkenCounter--;
                         createFloatingText("🛡️ Schild verloren!", orbitX, orbitY - 50);
                         triggerJuiceEffect('#ffffff');
                     } else {
@@ -641,8 +632,7 @@ function update() {
 
             if (success) {
                 obs.passed = true;
-                if (slowMotionBalkenCounter > 0) slowMotionBalkenCounter--;
-                if (!obs.isAutoExploded) {
+                    if (!obs.isAutoExploded) {
                     awardPoints(closestDist, Array.isArray(obs.color) ? obs.color[0] : (obs.color === COLOR_RAINBOW ? '#fff' : obs.color));
                 }
             }
@@ -663,10 +653,10 @@ function update() {
 
 function activateItem(effect) {
     if (effect === ITEM_STAR) {
-        starPowerBalkenCounter = 5; 
+        starPowerTimer = 10;
         createFloatingText("🌟 STAR POWER! UNSTERBLICH!", orbitX, orbitY - 50);
     } else if (effect === ITEM_SLOW) {
-        slowMotionBalkenCounter = 2;
+        slowMotionTimer = 10;
         createFloatingText("Zeitlupe! ⏳", orbitX, orbitY - 50);
     } else if (effect === ITEM_SHIELD) {
         hasShield = true;
@@ -682,7 +672,7 @@ function activateItem(effect) {
                 explodedCount++;
             }
         }
-        clearChargeCounter = 3 - explodedCount;
+        clearTimer = 10;
         createFloatingText("💥 SPRENGUNG!", orbitX, orbitY - 50);
         for (let j = 0; j < 50; j++) {
             particles.push({
@@ -726,8 +716,7 @@ function awardPoints(closestDist, color) {
 
 function createObstacle() {
     let autoPass = false;
-    if (clearChargeCounter > 0) {
-        clearChargeCounter--;
+    if (clearTimer > 0) {
         autoPass = true;
     }
 
@@ -1128,19 +1117,25 @@ function draw() {
 
     items.forEach(item => drawItem(item));
 
-    // Wide-Gap-Timer: Sanduhr oben rechts
-    if (wideGapTimer > 0) {
-        const tx = canvas.width - 36, ty = 62, tr = 16;
-        const frac = wideGapTimer / 10;
+    // Item-Timer oben rechts: alle aktiven Items als Kreisuhren
+    const activeTimers = [
+        { t: starPowerTimer,  max: 10, color: '#ffcc00', icon: '🌟' },
+        { t: slowMotionTimer, max: 10, color: '#00f2fe', icon: '⏳' },
+        { t: clearTimer,      max: 10, color: '#ff3300', icon: '💥' },
+        { t: wideGapTimer,    max: 10, color: '#aa00ff', icon: '↔'  },
+    ].filter(x => x.t > 0);
+    activeTimers.forEach((item, i) => {
+        const tx = canvas.width - 26, ty = 32 + i * 38, tr = 14;
+        const frac = item.t / item.max;
         ctx.beginPath(); ctx.arc(tx, ty, tr, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(170,0,255,0.15)'; ctx.fill();
+        ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fill();
         ctx.beginPath(); ctx.arc(tx, ty, tr, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
-        ctx.strokeStyle = '#aa00ff'; ctx.lineWidth = 3; ctx.stroke();
+        ctx.strokeStyle = item.color; ctx.lineWidth = 3; ctx.stroke();
         ctx.lineWidth = 1;
-        ctx.fillStyle = '#aa00ff'; ctx.font = 'bold 13px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText('↔', tx, ty + 1);
+        ctx.fillStyle = item.color; ctx.font = '12px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(item.icon, tx, ty + 1);
         ctx.textBaseline = 'alphabetic';
-    }
+    });
 
     const pX = orbitX + Math.cos(orbitAngle) * orbitRadius;
     const pY = orbitY + Math.sin(orbitAngle) * orbitRadius;
@@ -1158,24 +1153,24 @@ function draw() {
 
     if (!gameOver) {
         // --- BLINK-LOGIK NUR HIER EINFÜGEN ---
-        let blink = (starPowerBalkenCounter > 0) ? (Math.sin(Date.now() / 80) * 0.4 + 0.6) : 1.0;
+        let blink = (starPowerTimer > 0) ? (Math.sin(Date.now() / 80) * 0.4 + 0.6) : 1.0;
         ctx.globalAlpha = blink;
 
         let fillPink = COLOR_PINK, fillCyan = COLOR_CYAN, fillYellow = COLOR_YELLOW, fillPurple = COLOR_PURPLE;
 
         ctx.beginPath(); ctx.arc(pX, pY, sphereRadius, 0, Math.PI * 2);
-        ctx.fillStyle = fillPink; ctx.shadowBlur = (starPowerBalkenCounter > 0) ? 20 : 10; ctx.shadowColor = fillPink; ctx.fill();
+        ctx.fillStyle = fillPink; ctx.shadowBlur = (starPowerTimer > 0) ? 20 : 10; ctx.shadowColor = fillPink; ctx.fill();
 
         ctx.beginPath(); ctx.arc(cX, cY, sphereRadius, 0, Math.PI * 2);
-        ctx.fillStyle = (score >= 12 || starPowerBalkenCounter > 0) ? fillCyan : 'rgba(255,255,255,0.01)';
+        ctx.fillStyle = (score >= 12 || starPowerTimer > 0) ? fillCyan : 'rgba(255,255,255,0.01)';
         ctx.shadowColor = fillCyan; ctx.fill();
 
         ctx.beginPath(); ctx.arc(yX, yY, sphereRadius, 0, Math.PI * 2);
-        ctx.fillStyle = (score >= 51 || starPowerBalkenCounter > 0) ? fillYellow : 'rgba(255,255,255,0.01)';
+        ctx.fillStyle = (score >= 51 || starPowerTimer > 0) ? fillYellow : 'rgba(255,255,255,0.01)';
         ctx.shadowColor = fillYellow; ctx.fill();
 
         ctx.beginPath(); ctx.arc(bX, bY, sphereRadius, 0, Math.PI * 2);
-        ctx.fillStyle = (score >= 125 || starPowerBalkenCounter > 0) ? fillPurple : 'rgba(255,255,255,0.01)';
+        ctx.fillStyle = (score >= 125 || starPowerTimer > 0) ? fillPurple : 'rgba(255,255,255,0.01)';
         ctx.shadowColor = fillPurple; ctx.fill();
         
         ctx.globalAlpha = 1.0; // WICHTIG: Hier setzen wir Alpha zurück
