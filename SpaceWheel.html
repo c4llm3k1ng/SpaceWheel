@@ -9,6 +9,9 @@
     <meta name="theme-color" content="#0a0a0f">
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
     <title>Orbit-Sync</title>
     <style>
@@ -60,9 +63,121 @@
             0% { transform: translateY(0); opacity: 1; }
             100% { transform: translateY(-40px); opacity: 0; }
         }
+
+        /* === Overlay Screens === */
+        .overlay-screen {
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: #0b0c10; z-index: 100;
+            flex-direction: column; align-items: center; justify-content: center;
+            overflow-y: auto; touch-action: auto;
+            padding: 20px; box-sizing: border-box;
+        }
+        .overlay-screen.active { display: flex; }
+
+        .auth-card { background: #13141a; border-radius: 16px; padding: 28px 24px; width: 100%; max-width: 360px; }
+        .auth-tabs { display: flex; border-radius: 8px; overflow: hidden; background: #1e1f2e; margin-bottom: 20px; }
+        .auth-tab { flex: 1; padding: 10px; border: none; background: transparent; color: #888; font-size: 15px; cursor: pointer; }
+        .auth-tab.active { background: #ff007f; color: #fff; font-weight: bold; }
+        .auth-input {
+            display: block; width: 100%; box-sizing: border-box; padding: 12px 14px; margin-bottom: 12px;
+            background: #1e1f2e; border: 1px solid #2a2b3d; border-radius: 8px;
+            color: #fff; font-size: 15px; outline: none;
+            user-select: text; -webkit-user-select: text;
+        }
+        .auth-input:focus { border-color: #ff007f; }
+        .auth-btn { display: block; width: 100%; padding: 13px; background: #ff007f; border: none; border-radius: 8px; color: #fff; font-size: 16px; font-weight: bold; cursor: pointer; }
+        .auth-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .auth-error { color: #ff5555; font-size: 13px; margin-top: 8px; text-align: center; min-height: 18px; }
+        .auth-guest-btn { display: block; width: 100%; margin-top: 12px; background: none; border: none; color: #555; font-size: 13px; cursor: pointer; text-decoration: underline; }
+
+        .lb-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; width: 100%; max-width: 420px; }
+        .lb-back { background: #1e1f2e; border: none; color: #fff; width: 38px; height: 38px; border-radius: 50%; font-size: 20px; cursor: pointer; flex-shrink: 0; }
+        .lb-title { font-size: 20px; font-weight: bold; }
+        .lb-tabs { display: flex; gap: 8px; margin-bottom: 14px; width: 100%; max-width: 420px; }
+        .lb-tab { padding: 8px 20px; border-radius: 20px; border: none; background: #1e1f2e; color: #888; font-size: 14px; cursor: pointer; }
+        .lb-tab.active { background: #ff007f; color: #fff; font-weight: bold; }
+        .lb-list { width: 100%; max-width: 420px; overflow-y: auto; max-height: 55vh; }
+        .lb-row { display: flex; align-items: center; padding: 12px 16px; background: #13141a; border-radius: 10px; margin-bottom: 8px; gap: 12px; }
+        .lb-row.me { border-left: 3px solid #ff007f; }
+        .lb-rank { font-size: 15px; font-weight: bold; color: #888; width: 32px; text-align: center; flex-shrink: 0; }
+        .lb-name { flex: 1; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .lb-score { font-size: 16px; font-weight: bold; color: #00f2fe; flex-shrink: 0; }
+        .lb-add-btn { margin-top: 10px; padding: 12px 24px; background: #1e1f2e; border: 1px dashed #444; border-radius: 10px; color: #888; font-size: 14px; cursor: pointer; width: 100%; max-width: 420px; box-sizing: border-box; }
+        .friend-code-box { background: #1e1f2e; border-radius: 8px; padding: 10px 16px; text-align: center; margin-top: 10px; font-size: 12px; color: #666; width: 100%; max-width: 420px; box-sizing: border-box; }
+        .friend-code-box span { display: block; font-size: 22px; font-weight: bold; color: #00f2fe; letter-spacing: 4px; margin-top: 4px; }
+
+        #lb-game-btn {
+            position: fixed; top: 10px; right: 16px;
+            background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1);
+            color: #fff; width: 38px; height: 38px; border-radius: 50%;
+            font-size: 16px; cursor: pointer; z-index: 10;
+            display: none; align-items: center; justify-content: center; touch-action: auto;
+        }
+        .add-friend-card { background: #13141a; border-radius: 16px; padding: 28px 24px; width: 100%; max-width: 360px; }
+        .add-friend-title { font-size: 18px; font-weight: bold; margin-bottom: 16px; }
+        .add-friend-input {
+            display: block; width: 100%; box-sizing: border-box; padding: 12px 14px;
+            background: #1e1f2e; border: 1px solid #2a2b3d; border-radius: 8px;
+            color: #fff; font-size: 15px; outline: none; margin-bottom: 8px;
+            user-select: text; -webkit-user-select: text;
+        }
+        .add-friend-input:focus { border-color: #00f2fe; }
+        .add-friend-hint { font-size: 12px; color: #555; margin-bottom: 16px; }
     </style>
 </head>
 <body>
+
+    <button id="lb-game-btn" onclick="openLeaderboard()">🏆</button>
+
+    <!-- Auth Screen -->
+    <div id="auth-screen" class="overlay-screen active">
+        <div class="auth-card">
+            <div style="text-align:center;margin-bottom:20px;">
+                <div style="font-size:26px;font-weight:bold;color:#ff007f;">Orbit-Sync</div>
+                <div style="font-size:13px;color:#555;margin-top:4px;">Melde dich an, um Scores zu speichern</div>
+            </div>
+            <div class="auth-tabs">
+                <button class="auth-tab active" onclick="switchAuthTab('login')">Anmelden</button>
+                <button class="auth-tab" onclick="switchAuthTab('register')">Registrieren</button>
+            </div>
+            <input class="auth-input" id="auth-username" type="text" placeholder="Nutzername" autocomplete="username" />
+            <input class="auth-input" id="auth-password" type="password" placeholder="Passwort (mind. 6 Zeichen)" autocomplete="current-password" />
+            <button class="auth-btn" id="auth-submit" onclick="handleAuth()">Anmelden</button>
+            <div class="auth-error" id="auth-error"></div>
+            <button class="auth-guest-btn" onclick="startAsGuest()">Ohne Konto spielen</button>
+        </div>
+    </div>
+
+    <!-- Leaderboard Screen -->
+    <div id="leaderboard-screen" class="overlay-screen">
+        <div class="lb-header">
+            <button class="lb-back" onclick="closeLeaderboard()">←</button>
+            <div class="lb-title">Bestenliste</div>
+        </div>
+        <div class="lb-tabs">
+            <button class="lb-tab active" id="lb-tab-global" onclick="switchLbTab('global')">🌍 Global</button>
+            <button class="lb-tab" id="lb-tab-friends" onclick="switchLbTab('friends')">👥 Freunde</button>
+        </div>
+        <div class="lb-list" id="lb-list">
+            <div style="text-align:center;color:#555;padding:40px;">Laden...</div>
+        </div>
+        <button class="lb-add-btn" id="lb-add-friend-btn" onclick="showAddFriend()" style="display:none;">+ Freund hinzufügen</button>
+        <div class="friend-code-box" id="my-friend-code" style="display:none;">
+            Dein Freundescode<span id="my-code-text">------</span>
+        </div>
+    </div>
+
+    <!-- Add Friend Screen -->
+    <div id="add-friend-screen" class="overlay-screen">
+        <div class="add-friend-card">
+            <div class="add-friend-title">Freund hinzufügen</div>
+            <input class="add-friend-input" id="add-friend-input" type="text" placeholder="Nutzername oder Freundescode" />
+            <div class="add-friend-hint">Gib den Nutzernamen oder den 6-stelligen Freundescode ein</div>
+            <button class="auth-btn" onclick="handleAddFriend()">Hinzufügen</button>
+            <div class="auth-error" id="add-friend-error"></div>
+            <button class="auth-guest-btn" onclick="closeAddFriend()">Abbrechen</button>
+        </div>
+    </div>
 
     <div id="ui-layer">
         Score: <span id="score">0</span> | Highscore: <span id="highscore">0</span>
@@ -141,7 +256,7 @@ window.addEventListener('keydown', (e) => {
         resetGame();
     }
 });
-window.addEventListener('click', () => { if (gameOver) resetGame(); });
+window.addEventListener('click', () => { if (gameOver && !document.querySelector('.overlay-screen.active')) resetGame(); });
 window.addEventListener('keyup', (e) => keys[e.code] = false);
 
 // TOUCH LOGIK
@@ -768,6 +883,7 @@ function triggerGameOver() {
         highscore = score;
         localStorage.setItem('orbit_highscore_v46', highscore);
         highscoreEl.innerText = highscore;
+        updateFirebaseHighscore(score);
     }
     for (let i = 0; i < 60; i++) {
         particles.push({
@@ -1037,6 +1153,247 @@ function draw() {
 
 function loop() { update(); draw(); requestAnimationFrame(loop); }
 loop();
+
+// === FIREBASE ===
+const firebaseConfig = {
+    apiKey: "AIzaSyA5L5CTeb71NHMSegIvI0y7L1kzXuN_kfY",
+    authDomain: "spacewheel.firebaseapp.com",
+    projectId: "spacewheel",
+    storageBucket: "spacewheel.firebasestorage.app",
+    messagingSenderId: "285962836143",
+    appId: "1:285962836143:web:c8ae7720d14cacc7e39c5a"
+};
+firebase.initializeApp(firebaseConfig);
+const fbAuth = firebase.auth();
+const fbDb = firebase.firestore();
+
+let fbUser = null;
+let fbUserData = null;
+let authMode = 'login';
+let isGuest = false;
+
+function showScreen(id) {
+    ['auth-screen','leaderboard-screen','add-friend-screen']
+        .forEach(s => document.getElementById(s).classList.remove('active'));
+    if (id) document.getElementById(id).classList.add('active');
+    document.getElementById('lb-game-btn').style.display = id ? 'none' : 'flex';
+}
+
+function switchAuthTab(mode) {
+    authMode = mode;
+    document.querySelectorAll('.auth-tab').forEach((t, i) => {
+        t.classList.toggle('active', (i === 0) === (mode === 'login'));
+    });
+    document.getElementById('auth-submit').textContent = mode === 'login' ? 'Anmelden' : 'Registrieren';
+    document.getElementById('auth-error').textContent = '';
+}
+
+async function handleAuth() {
+    const btn = document.getElementById('auth-submit');
+    const username = document.getElementById('auth-username').value.trim();
+    const password = document.getElementById('auth-password').value;
+    const errEl = document.getElementById('auth-error');
+    errEl.textContent = '';
+    if (!username || !password) { errEl.textContent = 'Bitte alle Felder ausfüllen'; return; }
+    if (username.length < 3) { errEl.textContent = 'Nutzername mind. 3 Zeichen'; return; }
+    if (password.length < 6) { errEl.textContent = 'Passwort mind. 6 Zeichen'; return; }
+    btn.disabled = true; btn.textContent = '...';
+    try {
+        if (authMode === 'register') await registerUser(username, password);
+        else await loginUser(username, password);
+    } catch (e) {
+        errEl.textContent = e.message;
+        btn.disabled = false;
+        btn.textContent = authMode === 'login' ? 'Anmelden' : 'Registrieren';
+    }
+}
+
+function generateFriendCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+    return code;
+}
+
+async function registerUser(username, password) {
+    if (!/^[a-zA-Z0-9_]{3,20}$/.test(username))
+        throw new Error('Nur Buchstaben, Zahlen, _ (3–20 Zeichen)');
+    const usernameDoc = await fbDb.collection('usernames').doc(username.toLowerCase()).get();
+    if (usernameDoc.exists) throw new Error('Nutzername bereits vergeben');
+    const email = username.toLowerCase() + '@orbit-sync.app';
+    const cred = await fbAuth.createUserWithEmailAndPassword(email, password).catch(e => {
+        if (e.code === 'auth/weak-password') throw new Error('Passwort zu schwach (mind. 6 Zeichen)');
+        throw new Error('Registrierung fehlgeschlagen');
+    });
+    const uid = cred.user.uid;
+    let friendCode;
+    for (let i = 0; i < 10; i++) {
+        friendCode = generateFriendCode();
+        if (!(await fbDb.collection('friendCodes').doc(friendCode).get()).exists) break;
+    }
+    const batch = fbDb.batch();
+    batch.set(fbDb.collection('users').doc(uid), { username, friendCode, highscore: 0, friends: [] });
+    batch.set(fbDb.collection('usernames').doc(username.toLowerCase()), { uid });
+    batch.set(fbDb.collection('friendCodes').doc(friendCode), { uid });
+    await batch.commit();
+}
+
+async function loginUser(username, password) {
+    const email = username.toLowerCase() + '@orbit-sync.app';
+    await fbAuth.signInWithEmailAndPassword(email, password).catch(() => {
+        throw new Error('Nutzername oder Passwort falsch');
+    });
+}
+
+async function loadUserData(uid) {
+    const doc = await fbDb.collection('users').doc(uid).get();
+    if (!doc.exists) return;
+    fbUserData = doc.data();
+    const localHs = parseInt(localStorage.getItem('orbit_highscore_v46') || 0);
+    if (localHs > (fbUserData.highscore || 0)) {
+        await fbDb.collection('users').doc(uid).update({ highscore: localHs });
+        fbUserData.highscore = localHs;
+    } else if (fbUserData.highscore > localHs) {
+        highscore = fbUserData.highscore;
+        localStorage.setItem('orbit_highscore_v46', highscore);
+        highscoreEl.innerText = highscore;
+    }
+}
+
+async function updateFirebaseHighscore(newScore) {
+    if (!fbUser || !fbUserData) return;
+    if (newScore > (fbUserData.highscore || 0)) {
+        fbUserData.highscore = newScore;
+        await fbDb.collection('users').doc(fbUser.uid).update({ highscore: newScore }).catch(() => {});
+    }
+}
+
+function startAsGuest() {
+    isGuest = true;
+    showScreen(null);
+}
+
+async function openLeaderboard() {
+    showScreen('leaderboard-screen');
+    document.getElementById('lb-tab-global').classList.add('active');
+    document.getElementById('lb-tab-friends').classList.remove('active');
+    document.getElementById('lb-add-friend-btn').style.display = fbUser ? 'block' : 'none';
+    if (fbUser && fbUserData) {
+        document.getElementById('my-friend-code').style.display = 'block';
+        document.getElementById('my-code-text').textContent = fbUserData.friendCode || '------';
+    }
+    await renderLeaderboard('global');
+}
+
+function closeLeaderboard() { showScreen(null); }
+
+async function switchLbTab(tab) {
+    document.getElementById('lb-tab-global').classList.toggle('active', tab === 'global');
+    document.getElementById('lb-tab-friends').classList.toggle('active', tab === 'friends');
+    document.getElementById('lb-add-friend-btn').style.display = (tab === 'friends' && fbUser) ? 'block' : 'none';
+    await renderLeaderboard(tab);
+}
+
+function escapeHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+async function renderLeaderboard(tab) {
+    const listEl = document.getElementById('lb-list');
+    listEl.innerHTML = '<div style="text-align:center;color:#555;padding:40px;">Laden...</div>';
+    try {
+        let rows = [];
+        if (tab === 'global') {
+            const snap = await fbDb.collection('users').orderBy('highscore','desc').limit(50).get();
+            rows = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+        } else {
+            if (!fbUser) {
+                listEl.innerHTML = '<div style="text-align:center;color:#555;padding:40px;">Melde dich an, um Freunde zu sehen</div>';
+                return;
+            }
+            const allUids = [fbUser.uid, ...(fbUserData?.friends || [])];
+            const results = [];
+            for (let i = 0; i < allUids.length; i += 10) {
+                const chunk = allUids.slice(i, i+10);
+                const snap = await fbDb.collection('users')
+                    .where(firebase.firestore.FieldPath.documentId(), 'in', chunk).get();
+                snap.docs.forEach(d => results.push({ uid: d.id, ...d.data() }));
+            }
+            rows = results.sort((a,b) => (b.highscore||0) - (a.highscore||0));
+        }
+        if (!rows.length) {
+            listEl.innerHTML = '<div style="text-align:center;color:#555;padding:40px;">Noch keine Einträge</div>';
+            return;
+        }
+        const medals = ['🥇','🥈','🥉'];
+        listEl.innerHTML = rows.map((r,i) => {
+            const isMe = fbUser && r.uid === fbUser.uid;
+            const rank = medals[i] || `#${i+1}`;
+            return `<div class="lb-row${isMe?' me':''}">
+                <div class="lb-rank">${rank}</div>
+                <div class="lb-name">${escapeHtml(r.username||'?')}${isMe?' <span style="color:#ff007f;font-size:11px;">(du)</span>':''}</div>
+                <div class="lb-score">${r.highscore||0}</div>
+            </div>`;
+        }).join('');
+    } catch(e) {
+        listEl.innerHTML = '<div style="text-align:center;color:#ff5555;padding:40px;">Fehler beim Laden</div>';
+    }
+}
+
+function showAddFriend() {
+    document.getElementById('add-friend-screen').classList.add('active');
+    document.getElementById('add-friend-error').textContent = '';
+    document.getElementById('add-friend-input').value = '';
+}
+
+function closeAddFriend() {
+    document.getElementById('add-friend-screen').classList.remove('active');
+}
+
+async function handleAddFriend() {
+    const input = document.getElementById('add-friend-input').value.trim();
+    const errEl = document.getElementById('add-friend-error');
+    errEl.textContent = '';
+    if (!input) { errEl.textContent = 'Bitte Code oder Nutzernamen eingeben'; return; }
+    try {
+        let targetUid = null;
+        const codeSnap = await fbDb.collection('friendCodes').doc(input.toUpperCase()).get();
+        if (codeSnap.exists) {
+            targetUid = codeSnap.data().uid;
+        } else {
+            const unameSnap = await fbDb.collection('usernames').doc(input.toLowerCase()).get();
+            if (unameSnap.exists) targetUid = unameSnap.data().uid;
+        }
+        if (!targetUid) throw new Error('Nicht gefunden');
+        if (targetUid === fbUser.uid) throw new Error('Du kannst dich nicht selbst hinzufügen');
+        if ((fbUserData.friends||[]).includes(targetUid)) throw new Error('Bereits in deiner Freundesliste');
+        await fbDb.collection('users').doc(fbUser.uid).update({
+            friends: firebase.firestore.FieldValue.arrayUnion(targetUid)
+        });
+        if (!fbUserData.friends) fbUserData.friends = [];
+        fbUserData.friends.push(targetUid);
+        closeAddFriend();
+        await renderLeaderboard('friends');
+    } catch(e) {
+        errEl.textContent = e.message;
+    }
+}
+
+document.getElementById('auth-username').addEventListener('keydown', e => { if (e.key==='Enter') handleAuth(); });
+document.getElementById('auth-password').addEventListener('keydown', e => { if (e.key==='Enter') handleAuth(); });
+document.getElementById('add-friend-input').addEventListener('keydown', e => { if (e.key==='Enter') handleAddFriend(); });
+
+fbAuth.onAuthStateChanged(async (user) => {
+    if (user) {
+        fbUser = user;
+        await loadUserData(user.uid);
+        showScreen(null);
+    } else {
+        fbUser = null;
+        fbUserData = null;
+        if (!isGuest) showScreen('auth-screen');
+    }
+});
 
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js');
