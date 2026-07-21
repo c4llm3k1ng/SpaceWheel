@@ -222,7 +222,8 @@ let slowMotionBalkenCounter = 0;
 let hasShield = false;
 let clearChargeCounter = 0; 
 let starPowerBalkenCounter = 0; 
-let itemCooldownBalken = 0;  
+let itemCooldownBalken = 0;
+let wideGapTimer = 0;
 
 let lastColorStr = "";
 let colorStreakCount = 0;
@@ -244,10 +245,11 @@ const TYPE_DUAL_GAP = 'DUAL_GAP';
 const TYPE_TRIPLE_GAP = 'TRIPLE_GAP';
 const TYPE_BOMB = 'BOMB';
 
-const ITEM_STAR = 'STAR'; 
+const ITEM_STAR = 'STAR';
 const ITEM_SLOW = 'SLOW';
 const ITEM_SHIELD = 'SHIELD';
 const ITEM_CLEAR = 'CLEAR';
+const ITEM_WIDEGAP = 'WIDEGAP';
 
 window.addEventListener('keydown', (e) => {
     keys[e.code] = true;
@@ -314,6 +316,7 @@ function resetGame() {
     clearChargeCounter = 0;
     starPowerBalkenCounter = 0;
     itemCooldownBalken = 0;
+    wideGapTimer = 0;
     currentRequiredInterval = FIXED_INTERVAL;
     lastPattern = -1;
     lastColorStr = "";
@@ -356,6 +359,8 @@ function update() {
     const settings = getLevelSettings(score);
 
     let currentSpeed = settings.speed;
+    if (wideGapTimer > 0) wideGapTimer = Math.max(0, wideGapTimer - dt);
+
     if (starPowerBalkenCounter > 0) {
         levelEl.innerText = "🌟 STAR IMMUNITY AKTIV (" + starPowerBalkenCounter + " Balken)";
         levelEl.style.color = '#ffcc00';
@@ -363,6 +368,9 @@ function update() {
         currentSpeed *= 0.5;
         levelEl.innerText = "⏳ ZEITLUPE AKTIV (" + slowMotionBalkenCounter + " Balken)";
         levelEl.style.color = '#00f2fe';
+    } else if (wideGapTimer > 0) {
+        levelEl.innerText = "↔ BREITE LÜCKEN AKTIV (" + Math.ceil(wideGapTimer) + "s)";
+        levelEl.style.color = '#aa00ff';
     } else {
         levelEl.innerText = settings.name;
         levelEl.style.color = settings.color;
@@ -522,6 +530,8 @@ function update() {
                 // Kein Treffer: weiter prüfen auf dem nächsten Frame
                 continue;
             } else if (obs.type === TYPE_TRIPLE_GAP) {
+                if (wideGapTimer > 0) { success = true; }
+                else {
                 let leftBallX = (cX < pX) ? cX : pX;
                 let rightBallX = (cX < pX) ? pX : cX;
                 let yellowInCenter = (yX - sphereRadius + 1 >= obs.gapX2 && yX + sphereRadius - 1 <= obs.gapX2 + obs.gapWidth2);
@@ -548,6 +558,7 @@ function update() {
                         return;
                     }
                 }
+                } // end else (wideGapTimer <= 0)
             } else if (obs.type === TYPE_DUAL_GAP) {
                 let coord1 = getTargetCoordinates(obs.color[0], pX, pY, cX, cY, yX, yY, bX, bY);
                 let coord2 = getTargetCoordinates(obs.color[1], pX, pY, cX, cY, yX, yY, bX, bY);
@@ -555,8 +566,9 @@ function update() {
                 let bar1AtY = (obs.y + obs.height >= coord1.y - sphereRadius && obs.y <= coord1.y + sphereRadius);
                 let bar2AtY = (obs.y + obs.height >= coord2.y - sphereRadius && obs.y <= coord2.y + sphereRadius);
 
-                let ball1InGap = (coord1.x - sphereRadius + 1 >= obs.gapX && coord1.x + sphereRadius - 1 <= obs.gapX + obs.gapWidth);
-                let ball2InGap = (coord2.x - sphereRadius + 1 >= obs.gapX2 && coord2.x + sphereRadius - 1 <= obs.gapX2 + obs.gapWidth2);
+                let _wb2 = wideGapTimer > 0 ? 20 : 0;
+                let ball1InGap = (coord1.x - sphereRadius + 1 >= obs.gapX - _wb2 && coord1.x + sphereRadius - 1 <= obs.gapX + obs.gapWidth + _wb2);
+                let ball2InGap = (coord2.x - sphereRadius + 1 >= obs.gapX2 - _wb2 && coord2.x + sphereRadius - 1 <= obs.gapX2 + obs.gapWidth2 + _wb2);
 
                 // Zustand pro Frame aufzeichnen — bleibt über Frames hinweg erhalten
                 if (bar1AtY) { obs._dual1Checked = true; if (ball1InGap) obs._dual1Passed = true; }
@@ -604,10 +616,11 @@ function update() {
                     let barAtBallY = (obs.y + obs.height >= ball.y - sphereRadius && obs.y <= ball.y + sphereRadius);
                     if (!barAtBallY) continue;
                     anyBallReached = true;
-                    let inGap = (ball.x - sphereRadius + 1 >= obs.gapX && ball.x + sphereRadius - 1 <= obs.gapX + obs.gapWidth);
+                    let _wb = wideGapTimer > 0 ? 30 : 0;
+                    let inGap = (ball.x - sphereRadius + 1 >= obs.gapX - _wb && ball.x + sphereRadius - 1 <= obs.gapX + obs.gapWidth + _wb);
                     if (inGap) {
                         success = true;
-                        closestDist = Math.min(closestDist, getDistanceToGapEdges(ball.x, obs.gapX, obs.gapWidth));
+                        closestDist = Math.min(closestDist, getDistanceToGapEdges(ball.x, obs.gapX - _wb, obs.gapWidth + _wb * 2));
                     }
                 }
 
@@ -658,6 +671,9 @@ function activateItem(effect) {
     } else if (effect === ITEM_SHIELD) {
         hasShield = true;
         createFloatingText("Schild aktiv! 🛡️", orbitX, orbitY - 50);
+    } else if (effect === ITEM_WIDEGAP) {
+        wideGapTimer = 10;
+        createFloatingText("↔ BREITE LÜCKEN!", orbitX, orbitY - 50);
     } else if (effect === ITEM_CLEAR) {
         let explodedCount = 0;
         for (let o of obstacles) {
@@ -822,15 +838,20 @@ function createObstacle() {
     // KORREKTUR: Frequenz auf mathematisch exakte 28% eingestellt (Gerundete 27,5%)
     if (score >= 8 && itemCooldownBalken === 0 && Math.random() < 0.28) { 
         let itemX = orbitX + (Math.random() * 120 - 60);
-        let itemColor = pool[Math.floor(Math.random() * pool.length)];
-        
+        let itemPool = [COLOR_PINK];
+        if (score >= 12) itemPool.push(COLOR_CYAN);
+        if (score >= 51) itemPool.push(COLOR_YELLOW);
+        if (score >= 125) itemPool.push(COLOR_PURPLE);
+        let itemColor = itemPool[Math.floor(Math.random() * itemPool.length)];
+
         let itemEffect = ITEM_SLOW;
         let rarityRoll = Math.random();
-        
+
         if (rarityRoll < 0.10) itemEffect = ITEM_SHIELD;
-        else if (rarityRoll < 0.30) itemEffect = ITEM_STAR;  
-        else if (rarityRoll < 0.60) itemEffect = ITEM_CLEAR; 
-        else itemEffect = ITEM_SLOW;  
+        else if (rarityRoll < 0.25) itemEffect = ITEM_STAR;
+        else if (rarityRoll < 0.45) itemEffect = ITEM_WIDEGAP;
+        else if (rarityRoll < 0.70) itemEffect = ITEM_CLEAR;
+        else itemEffect = ITEM_SLOW;
 
         items.push({
             x: itemX, 
@@ -958,6 +979,7 @@ function drawItem(item) {
     if (item.effect === ITEM_SLOW) icon = "⏳";
     if (item.effect === ITEM_SHIELD) icon = "🛡️";
     if (item.effect === ITEM_CLEAR) icon = "💥";
+    if (item.effect === ITEM_WIDEGAP) icon = "↔";
     
     ctx.fillText(icon, 0, 1);
     ctx.restore();
@@ -968,6 +990,14 @@ function draw() {
     ctx.fillStyle = '#0a0a0f'; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     obstacles.forEach(obs => {
+        let _sg;
+        if (wideGapTimer > 0 && obs.type !== TYPE_BOMB) {
+            _sg = { gapX: obs.gapX, gapWidth: obs.gapWidth, gapX2: obs.gapX2, gapWidth2: obs.gapWidth2, gapX3: obs.gapX3, gapWidth3: obs.gapWidth3 };
+            const d = obs.type === TYPE_TRIPLE_GAP ? 7 : obs.type === TYPE_DUAL_GAP ? 20 : 30;
+            obs.gapX -= d; obs.gapWidth += d * 2;
+            obs.gapX2 -= d; obs.gapWidth2 += d * 2;
+            if (obs.type === TYPE_TRIPLE_GAP) { obs.gapX3 -= d; obs.gapWidth3 += d * 2; }
+        }
         if (obs.type === TYPE_BOMB) {
             if (!obs.passed) {
                 ctx.save();
@@ -1093,9 +1123,24 @@ function draw() {
             ctx.strokeStyle = obs.color; ctx.lineWidth = 3;
             ctx.strokeRect(0, obs.y, obs.gapX, obs.height); ctx.strokeRect(obs.gapX + obs.gapWidth, obs.y, canvas.width - (obs.gapX + obs.gapWidth), obs.height);
         }
+        if (_sg) { obs.gapX = _sg.gapX; obs.gapWidth = _sg.gapWidth; obs.gapX2 = _sg.gapX2; obs.gapWidth2 = _sg.gapWidth2; obs.gapX3 = _sg.gapX3; obs.gapWidth3 = _sg.gapWidth3; }
     });
 
     items.forEach(item => drawItem(item));
+
+    // Wide-Gap-Timer: Sanduhr oben rechts
+    if (wideGapTimer > 0) {
+        const tx = canvas.width - 36, ty = 62, tr = 16;
+        const frac = wideGapTimer / 10;
+        ctx.beginPath(); ctx.arc(tx, ty, tr, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(170,0,255,0.15)'; ctx.fill();
+        ctx.beginPath(); ctx.arc(tx, ty, tr, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
+        ctx.strokeStyle = '#aa00ff'; ctx.lineWidth = 3; ctx.stroke();
+        ctx.lineWidth = 1;
+        ctx.fillStyle = '#aa00ff'; ctx.font = 'bold 13px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('↔', tx, ty + 1);
+        ctx.textBaseline = 'alphabetic';
+    }
 
     const pX = orbitX + Math.cos(orbitAngle) * orbitRadius;
     const pY = orbitY + Math.sin(orbitAngle) * orbitRadius;
