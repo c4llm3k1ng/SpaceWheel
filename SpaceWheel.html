@@ -687,7 +687,7 @@ function activateItem(effect) {
 function awardPoints(closestDist, color) {
     let earnedPoints = 1; // Basis-Punkt für jeden geclearten Balken
 
-    if (closestDist <= 5) {
+    if (closestDist <= 5 && wideGapTimer <= 0) {
         perfectStreak++;
         let bonus = 1; // Standard Perfect-Bonus (Streak 1–2)
 
@@ -706,7 +706,7 @@ function awardPoints(closestDist, color) {
         earnedPoints += bonus;
         createFloatingText(`+${earnedPoints} Perfect! 🎯`, orbitX, orbitY - 50);
         triggerJuiceEffect(color);
-    } else {
+    } else if (wideGapTimer <= 0) {
         perfectStreak = 0;
     }
 
