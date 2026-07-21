@@ -413,14 +413,15 @@ function update() {
                 let leftInGap = (leftBallX - sphereRadius + 1 >= obs.gapX && leftBallX + sphereRadius - 1 <= obs.gapX + obs.gapWidth);
                 let rightInGap = (rightBallX - sphereRadius + 1 >= obs.gapX3 && rightBallX + sphereRadius - 1 <= obs.gapX3 + obs.gapWidth3);
 
-                if (yellowInCenter && leftInGap && rightInGap) {
+                let tripleAnySuccess = yellowInCenter || leftInGap || rightInGap;
+                let tripleAllFail = !yellowInCenter && !leftInGap && !rightInGap;
+
+                if (tripleAnySuccess) {
                     success = true;
-                    closestDist = Math.min(
-                        getDistanceToGapEdges(yX, obs.gapX2, obs.gapWidth2),
-                        getDistanceToGapEdges(leftBallX, obs.gapX, obs.gapWidth),
-                        getDistanceToGapEdges(rightBallX, obs.gapX3, obs.gapWidth3)
-                    );
-                } else {
+                    if (yellowInCenter) closestDist = Math.min(closestDist, getDistanceToGapEdges(yX, obs.gapX2, obs.gapWidth2));
+                    if (leftInGap) closestDist = Math.min(closestDist, getDistanceToGapEdges(leftBallX, obs.gapX, obs.gapWidth));
+                    if (rightInGap) closestDist = Math.min(closestDist, getDistanceToGapEdges(rightBallX, obs.gapX3, obs.gapWidth3));
+                } else if (tripleAllFail) {
                     if (hasShield) {
                         hasShield = false;
                         obs.passed = true;
@@ -443,13 +444,14 @@ function update() {
                     let ball1InGap = (coord1.x - sphereRadius + 1 >= obs.gapX && coord1.x + sphereRadius - 1 <= obs.gapX + obs.gapWidth);
                     let ball2InGap = (coord2.x - sphereRadius + 1 >= obs.gapX2 && coord2.x + sphereRadius - 1 <= obs.gapX2 + obs.gapWidth2);
 
-                    let anyFail = (bar1AtY && !ball1InGap) || (bar2AtY && !ball2InGap);
-                    let bothSuccess = bar1AtY && bar2AtY && ball1InGap && ball2InGap;
+                    let dualAnySuccess = (bar1AtY && ball1InGap) || (bar2AtY && ball2InGap);
+                    let dualAllFail = (bar1AtY && !ball1InGap) && (bar2AtY && !ball2InGap);
 
-                    if (bothSuccess) {
+                    if (dualAnySuccess) {
                         success = true;
-                        closestDist = Math.min(getDistanceToGapEdges(coord1.x, obs.gapX, obs.gapWidth), getDistanceToGapEdges(coord2.x, obs.gapX2, obs.gapWidth2));
-                    } else if (anyFail) {
+                        if (bar1AtY && ball1InGap) closestDist = Math.min(closestDist, getDistanceToGapEdges(coord1.x, obs.gapX, obs.gapWidth));
+                        if (bar2AtY && ball2InGap) closestDist = Math.min(closestDist, getDistanceToGapEdges(coord2.x, obs.gapX2, obs.gapWidth2));
+                    } else if (dualAllFail) {
                         if (hasShield) {
                             hasShield = false;
                             obs.passed = true;
