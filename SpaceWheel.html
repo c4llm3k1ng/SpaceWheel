@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Orbit-Sync">
+    <meta name="theme-color" content="#0a0a0f">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+    <title>Orbit-Sync</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #0b0c10;
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+        canvas {
+            background-color: #0d0d12;
+            box-shadow: 0 0 30px rgba(255, 255, 255, 0.03);
+            max-width: 100%;
+            max-height: 100vh;
+        }
+        #ui-layer {
+            position: absolute;
+            top: 40px;
+            font-size: 22px;
+            font-weight: bold;
+            text-align: center;
+            width: 100%;
+            pointer-events: none;
+            text-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+        #level-banner {
+            color: #ffcc00;
+            font-size: 16px;
+            margin-top: 5px;
+        }
+        .bonus-text {
+            position: absolute;
+            color: #00ffcc;
+            font-size: 20px;
+            font-weight: bold;
+            animation: floatUp 0.6s ease-out forwards;
+            pointer-events: none;
+        }
+        @keyframes floatUp {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-40px); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui-layer">
+        Score: <span id="score">0</span> | Highscore: <span id="highscore">0</span>
+        <div id="level-banner">Stufe 1: Tutorial (Roter Fokus) 🔴</div>
+    </div>
+    <canvas id="gameCanvas" width="450" height="800"></canvas>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score');
+const highscoreEl = document.getElementById('highscore');
+const levelEl = document.getElementById('level-banner');
+
+let score = 0;
+let highscore = localStorage.getItem('orbit_highscore_v46') || 0;
+highscoreEl.innerText = highscore;
+
+let gameOver = false;
+let lastTime = performance.now(); 
+
+const orbitX = canvas.width / 2;
+const orbitY = canvas.height * 0.72; 
+const orbitRadius = 65; 
+
+let orbitAngle = 0; 
+let targetOrbitAngle = 0; 
+
+// Radgeschwindigkeit um 8% erhöht (von 6.3 auf 6.8)
+const keyboardRotationSpeed = 6.8; 
+const sphereRadius = 12; 
+
+let obstacles = [];
+let items = []; 
+let spawnTimer = 9999; 
+const FIXED_INTERVAL = 1450; 
+let currentRequiredInterval = FIXED_INTERVAL; 
+let lastPattern = -1; 
+
+// Buff / Item Zustände
+let slowMotionBalkenCounter = 0; 
+let hasShield = false;
+let clearChargeCounter = 0; 
+let starPowerBalkenCounter = 0; 
+let itemCooldownBalken = 0;  
+
+let lastColorStr = "";
+let colorStreakCount = 0;
+let perfectStreak = 0;
+
+let particles = [];
+let keys = {};
+
+let isDragging = false;
+let startTouchAngle = 0;
+let startOrbitAngle = 0;
+
+const COLOR_PINK = '#ff007f';   
+const COLOR_CYAN = '#00f2fe';   
+const COLOR_YELLOW = '#ffcc00'; 
+const COLOR_PURPLE = '#aa00ff';
+const COLOR_RAINBOW = 'RAINBOW';
+const TYPE_DUAL_GAP = 'DUAL_GAP';
+const TYPE_TRIPLE_GAP = 'TRIPLE_GAP';
+const TYPE_BOMB = 'BOMB';
+
+const ITEM_STAR = 'STAR'; 
+const ITEM_SLOW = 'SLOW';
+const ITEM_SHIELD = 'SHIELD';
+const ITEM_CLEAR = 'CLEAR';
+
+window.addEventListener('keydown', (e) => {
+    keys[e.code] = true;
+    if (e.code === 'Space' && gameOver) {
+        e.preventDefault();
+        resetGame();
+    }
+});
+window.addEventListener('click', () => { if (gameOver) resetGame(); });
+window.addEventListener('keyup', (e) => keys[e.code] = false);
+
+// TOUCH LOGIK
+canvas.addEventListener('touchstart', (e) => {
+    if (gameOver) {
+        resetGame();
+        return;
+    }
+    const t = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const touchX = (t.clientX - rect.left) * scaleX;
+    const touchY = (t.clientY - rect.top) * scaleY;
+
+    isDragging = true;
+    startTouchAngle = Math.atan2(touchY - orbitY, touchX - orbitX);
+    startOrbitAngle = orbitAngle;
+    targetOrbitAngle = orbitAngle;
+}, {passive: false});
+
+canvas.addEventListener('touchmove', (e) => {
+    if (!isDragging || gameOver) return;
+    const t = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const touchX = (t.clientX - rect.left) * scaleX;
+    const touchY = (t.clientY - rect.top) * scaleY;
+
+    const currentTouchAngle = Math.atan2(touchY - orbitY, touchX - orbitX);
+    let angleDifference = currentTouchAngle - startTouchAngle;
+    angleDifference = Math.atan2(Math.sin(angleDifference), Math.cos(angleDifference));
+    
+    targetOrbitAngle = startOrbitAngle + angleDifference;
+}, {passive: false});
+
+canvas.addEventListener('touchend', () => { isDragging = false; });
+canvas.addEventListener('touchcancel', () => { isDragging = false; });
+
+function resetGame() {
+    score = 0;
+    scoreEl.innerText = score;
+    levelEl.innerText = "Stufe 1: Tutorial (Roter Fokus) 🔴";
+    levelEl.style.color = COLOR_PINK;
+    obstacles = [];
+    items = [];
+    particles = [];
+    gameOver = false;
+    orbitAngle = 0; 
+    targetOrbitAngle = 0;
+    spawnTimer = 9999; 
+    slowMotionBalkenCounter = 0;
+    hasShield = false;
+    clearChargeCounter = 0;
+    starPowerBalkenCounter = 0;
+    itemCooldownBalken = 0;
+    currentRequiredInterval = FIXED_INTERVAL;
+    lastPattern = -1;
+    lastColorStr = "";
+    colorStreakCount = 0;
+    perfectStreak = 0;
+    isDragging = false;
+    lastTime = performance.now();
+}
+
+function getLevelSettings(s) {
+    if (s >= 125) {
+        return { speed: 490, name: "Stufe 9: Goldene Kugel aktiv 🌟", color: COLOR_PURPLE };
+    } else if (s >= 90) {
+        return { speed: 440, name: "Stufe 8: TRIPLE-GAPS freigeschaltet! 👥⚡", color: "#00ffcc" };
+    } else if (s >= 72) {
+        return { speed: 410, name: "Stufe 7: Tri-Color Highspeed ⚡", color: COLOR_YELLOW };
+    } else if (s >= 51) {
+        let local = s - 51;
+        if (local < 4) return { speed: 310, name: "Stufe 6: Gelb freigeschaltet! 🌟", color: COLOR_YELLOW };
+        return { speed: 350, name: "Stufe 6: Tri-Color Einstieg 🌟", color: COLOR_YELLOW };
+    } else if (s >= 41) {
+        return { speed: 380, name: "Stufe 5: Dual-Gaps aktiv! 👥", color: COLOR_PINK };
+    } else if (s >= 27) {
+        return { speed: 350, name: "Stufe 4: Zebra-Balken aktiv 🦓", color: COLOR_CYAN };
+    } else if (s >= 20) {
+        return { speed: 320, name: "Stufe 3: Tempo erhöht", color: COLOR_CYAN };
+    } else if (s >= 12) {
+        return { speed: 290, name: "Stufe 2: Cyan freigeschaltet! 🔵", color: COLOR_CYAN };
+    }
+    return { speed: 285, name: "Stufe 1: Tutorial (Roter Fokus) 🔴", color: "#00ff66" };
+}
+
+function update() {
+    const now = performance.now();
+    const dt = Math.min(0.1, (now - lastTime) / 1000); 
+    lastTime = now;
+
+    if (gameOver) return;
+
+    const settings = getLevelSettings(score);
+
+    let currentSpeed = settings.speed;
+    if (starPowerBalkenCounter > 0) {
+        levelEl.innerText = "🌟 STAR IMMUNITY AKTIV (" + starPowerBalkenCounter + " Balken)";
+        levelEl.style.color = '#ffcc00';
+    } else if (slowMotionBalkenCounter > 0) {
+        currentSpeed *= 0.5;
+        levelEl.innerText = "⏳ ZEITLUPE AKTIV (" + slowMotionBalkenCounter + " Balken)";
+        levelEl.style.color = '#00f2fe';
+    } else {
+        levelEl.innerText = settings.name;
+        levelEl.style.color = settings.color;
+    }
+
+    if (isDragging) {
+        let diff = targetOrbitAngle - orbitAngle;
+        diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+        orbitAngle += diff * (1 - Math.exp(-56 * dt)); 
+    } else {
+        if (keys['ArrowLeft']) orbitAngle -= keyboardRotationSpeed * dt;
+        if (keys['ArrowRight']) orbitAngle += keyboardRotationSpeed * dt;
+        targetOrbitAngle = orbitAngle;
+    }
+    orbitAngle = orbitAngle % (Math.PI * 2);
+
+    const pX = orbitX + Math.cos(orbitAngle) * orbitRadius;
+    const pY = orbitY + Math.sin(orbitAngle) * orbitRadius;
+    const yX = orbitX + Math.cos(orbitAngle + Math.PI / 2) * orbitRadius;
+    const yY = orbitY + Math.sin(orbitAngle + Math.PI / 2) * orbitRadius;
+    const cX = orbitX + Math.cos(orbitAngle + Math.PI) * orbitRadius;
+    const cY = orbitY + Math.sin(orbitAngle + Math.PI) * orbitRadius;
+    const bX = orbitX + Math.cos(orbitAngle + Math.PI * 1.5) * orbitRadius;
+    const bY = orbitY + Math.sin(orbitAngle + Math.PI * 1.5) * orbitRadius;
+
+    let timerProgress = dt * 1000;
+    if (slowMotionBalkenCounter > 0 && starPowerBalkenCounter <= 0) {
+        timerProgress *= 0.5; 
+    }
+    spawnTimer += timerProgress;
+
+    if (spawnTimer >= currentRequiredInterval) {
+        spawnTimer = 0;
+        createObstacle();
+    }
+
+    for (let i = items.length - 1; i >= 0; i--) {
+        let item = items[i];
+        item.y += currentSpeed * dt;
+        item.rotation += 2 * dt;
+
+        let coord = getTargetCoordinates(item.color, pX, pY, cX, cY, yX, yY, bX, bY);
+        let dist = Math.hypot(coord.x - item.x, coord.y - item.y);
+
+        if (dist <= sphereRadius + 14) {
+            activateItem(item.effect);
+            triggerJuiceEffect(item.color);
+            items.splice(i, 1);
+            continue;
+        }
+
+        if (item.y > canvas.height + 50) {
+            items.splice(i, 1);
+        }
+    }
+
+    for (let i = obstacles.length - 1; i >= 0; i--) {
+        let obs = obstacles[i];
+        obs.y += currentSpeed * dt; 
+
+        // --- HIER MUSS DER CODE REIN ---
+        let passedY = orbitY + orbitRadius + sphereRadius;
+        if (obs.y > passedY && !obs.passed) {
+            obs.passed = true;
+            if (slowMotionBalkenCounter > 0) slowMotionBalkenCounter--;
+            if (!obs.isAutoExploded) {
+                score += 1;
+                scoreEl.innerText = score;
+                if (obs.type === TYPE_BOMB) {
+                    createFloatingText("+1 Bombe ausgewichen! 💣", orbitX, orbitY - 50);
+                } else {
+                    createFloatingText("+1 Ausgewichen! 💨", orbitX, orbitY - 50);
+                }
+            }
+        }
+        // --------------------------------
+
+        // Danach folgt deine bestehende Kollisionslogik:
+        let inZone;
+        if (obs.type === TYPE_BOMB) {
+            let bY = obs.y + obs.height / 2;
+            inZone = bY >= orbitY - orbitRadius - sphereRadius - 13 && bY <= orbitY + orbitRadius + sphereRadius + 13;
+        } else if (obs.type === TYPE_TRIPLE_GAP) {
+            // Schmale Zone: TRIPLE_GAP prüft nur X-Positionen am orbitY-Niveau
+            inZone = (obs.y + obs.height >= orbitY - sphereRadius && obs.y <= orbitY + sphereRadius);
+        } else {
+            // Breite Zone: deckt alle möglichen Kugel-Y-Positionen ab (mit per-Kugel-Check innen)
+            inZone = (obs.y + obs.height >= orbitY - orbitRadius - sphereRadius && obs.y <= orbitY + orbitRadius + sphereRadius);
+        }
+        if (!obs.passed && inZone) {
+            if (obs.isAutoExploded) {
+                obs.passed = true;
+                score += 1;
+                scoreEl.innerText = score;
+                createFloatingText("💥 +1 Gesprengt!", orbitX, orbitY - 50);
+                continue;
+            }
+
+            if (starPowerBalkenCounter > 0) {
+                starPowerBalkenCounter--; 
+                if (starPowerBalkenCounter === 0) {
+                    currentRequiredInterval = FIXED_INTERVAL + 1200; 
+                    spawnTimer = 0; 
+                }
+                obs.passed = true;
+                score += 1;
+                scoreEl.innerText = score;
+                createFloatingText("+1 Star Point! 🌟", orbitX, orbitY - 50);
+                triggerJuiceEffect('#ffcc00');
+                continue; 
+            }
+
+            let success = false;
+            let closestDist = 999;
+
+            if (obs.type === TYPE_BOMB) {
+                const bombRadius = 13;
+                let bombY = obs.y + obs.height / 2;
+                let coord1 = {x: pX, y: pY};
+                let coord2 = (score >= 12) ? {x: cX, y: cY} : null;
+                let coord3 = (score >= 51) ? {x: yX, y: yY} : null;
+                let coord4 = (score >= 125) ? {x: bX, y: bY} : null;
+
+                let hit = false;
+                [coord1, coord2, coord3, coord4].forEach(coord => {
+                    if (coord) {
+                        let dx = coord.x - obs.gapX;
+                        let dy = coord.y - bombY;
+                        if (Math.sqrt(dx * dx + dy * dy) <= sphereRadius + bombRadius) {
+                            hit = true;
+                        }
+                    }
+                });
+
+                if (hit) {
+                    if (hasShield) {
+                        hasShield = false;
+                        obs.passed = true;
+                        if (slowMotionBalkenCounter > 0) slowMotionBalkenCounter--;
+                        createFloatingText("🛡️ Schild verloren!", orbitX, orbitY - 50);
+                        triggerJuiceEffect('#ffffff');
+                    } else {
+                        for (let j = 0; j < 50; j++) {
+                            particles.push({
+                                x: obs.gapX + (Math.random() * 60 - 30),
+                                y: orbitY + (Math.random() * 60 - 30),
+                                vx: (Math.random() * 16 - 8),
+                                vy: (Math.random() * 16 - 8),
+                                color: Math.random() > 0.5 ? '#ff6600' : '#ffcc00',
+                                alpha: 1, size: Math.random() * 6 + 2
+                            });
+                        }
+                        triggerGameOver();
+                        return;
+                    }
+                }
+                // Kein Treffer: weiter prüfen auf dem nächsten Frame
+                continue;
+            } else if (obs.type === TYPE_TRIPLE_GAP) {
+                let leftBallX = (cX < pX) ? cX : pX;
+                let rightBallX = (cX < pX) ? pX : cX;
+                let yellowInCenter = (yX - sphereRadius + 1 >= obs.gapX2 && yX + sphereRadius - 1 <= obs.gapX2 + obs.gapWidth2);
+                let leftInGap = (leftBallX - sphereRadius + 1 >= obs.gapX && leftBallX + sphereRadius - 1 <= obs.gapX + obs.gapWidth);
+                let rightInGap = (rightBallX - sphereRadius + 1 >= obs.gapX3 && rightBallX + sphereRadius - 1 <= obs.gapX3 + obs.gapWidth3);
+
+                let tripleAnySuccess = yellowInCenter || leftInGap || rightInGap;
+                let tripleAllFail = !yellowInCenter && !leftInGap && !rightInGap;
+
+                if (tripleAnySuccess) {
+                    success = true;
+                    if (yellowInCenter) closestDist = Math.min(closestDist, getDistanceToGapEdges(yX, obs.gapX2, obs.gapWidth2));
+                    if (leftInGap) closestDist = Math.min(closestDist, getDistanceToGapEdges(leftBallX, obs.gapX, obs.gapWidth));
+                    if (rightInGap) closestDist = Math.min(closestDist, getDistanceToGapEdges(rightBallX, obs.gapX3, obs.gapWidth3));
+                } else if (tripleAllFail) {
+                    if (hasShield) {
+                        hasShield = false;
+                        obs.passed = true;
+                        if (slowMotionBalkenCounter > 0) slowMotionBalkenCounter--;
+                        createFloatingText("🛡️ Schild verloren!", orbitX, orbitY - 50);
+                        triggerJuiceEffect('#ffffff');
+                    } else {
+                        triggerGameOver();
+                        return;
+                    }
+                }
+            } else if (obs.type === TYPE_DUAL_GAP) {
+                let coord1 = getTargetCoordinates(obs.color[0], pX, pY, cX, cY, yX, yY, bX, bY);
+                let coord2 = getTargetCoordinates(obs.color[1], pX, pY, cX, cY, yX, yY, bX, bY);
+
+                let bar1AtY = (obs.y + obs.height >= coord1.y - sphereRadius && obs.y <= coord1.y + sphereRadius);
+                let bar2AtY = (obs.y + obs.height >= coord2.y - sphereRadius && obs.y <= coord2.y + sphereRadius);
+
+                let ball1InGap = (coord1.x - sphereRadius + 1 >= obs.gapX && coord1.x + sphereRadius - 1 <= obs.gapX + obs.gapWidth);
+                let ball2InGap = (coord2.x - sphereRadius + 1 >= obs.gapX2 && coord2.x + sphereRadius - 1 <= obs.gapX2 + obs.gapWidth2);
+
+                // Zustand pro Frame aufzeichnen — bleibt über Frames hinweg erhalten
+                if (bar1AtY) { obs._dual1Checked = true; if (ball1InGap) obs._dual1Passed = true; }
+                if (bar2AtY) { obs._dual2Checked = true; if (ball2InGap) obs._dual2Passed = true; }
+
+                let dualAnySuccess = obs._dual1Passed || obs._dual2Passed;
+                let dualAllFail = (obs._dual1Checked && !obs._dual1Passed) && (obs._dual2Checked && !obs._dual2Passed);
+
+                if (dualAnySuccess) {
+                    success = true;
+                    if (bar1AtY && ball1InGap) closestDist = Math.min(closestDist, getDistanceToGapEdges(coord1.x, obs.gapX, obs.gapWidth));
+                    if (bar2AtY && ball2InGap) closestDist = Math.min(closestDist, getDistanceToGapEdges(coord2.x, obs.gapX2, obs.gapWidth2));
+                } else if (dualAllFail) {
+                    if (hasShield) {
+                        hasShield = false;
+                        obs.passed = true;
+                        if (slowMotionBalkenCounter > 0) slowMotionBalkenCounter--;
+                        createFloatingText("🛡️ Schild verloren!", orbitX, orbitY - 50);
+                        triggerJuiceEffect('#ffffff');
+                    } else {
+                        triggerGameOver();
+                        return;
+                    }
+                }
+            } else {
+                // Nur die Kugeln, deren Farbe zum Balken passt, sind relevant.
+                let targetBalls = [];
+                if (obs.color === COLOR_RAINBOW) {
+                    targetBalls.push({x: pX, y: pY});
+                    if (score >= 12) targetBalls.push({x: cX, y: cY});
+                    if (score >= 51) targetBalls.push({x: yX, y: yY});
+                    if (score >= 125) targetBalls.push({x: bX, y: bY});
+                } else if (Array.isArray(obs.color)) {
+                    if (obs.color.includes(COLOR_PINK)) targetBalls.push({x: pX, y: pY});
+                    if (obs.color.includes(COLOR_CYAN) && score >= 12) targetBalls.push({x: cX, y: cY});
+                    if (obs.color.includes(COLOR_YELLOW) && score >= 51) targetBalls.push({x: yX, y: yY});
+                    if (obs.color.includes(COLOR_PURPLE) && score >= 125) targetBalls.push({x: bX, y: bY});
+                } else {
+                    targetBalls.push(getTargetCoordinates(obs.color, pX, pY, cX, cY, yX, yY, bX, bY));
+                }
+
+                let anyBallReached = false;
+                for (let ball of targetBalls) {
+                    // Nur prüfen wenn der Balken die tatsächliche Y-Position dieser Kugel erreicht hat
+                    let barAtBallY = (obs.y + obs.height >= ball.y - sphereRadius && obs.y <= ball.y + sphereRadius);
+                    if (!barAtBallY) continue;
+                    anyBallReached = true;
+                    let inGap = (ball.x - sphereRadius + 1 >= obs.gapX && ball.x + sphereRadius - 1 <= obs.gapX + obs.gapWidth);
+                    if (inGap) {
+                        success = true;
+                        closestDist = Math.min(closestDist, getDistanceToGapEdges(ball.x, obs.gapX, obs.gapWidth));
+                    }
+                }
+
+                // Schild-Logik: nur auslösen wenn der Balken wirklich bei der Kugel angekommen ist
+                if (!success && anyBallReached && starPowerBalkenCounter <= 0) {
+                    if (hasShield) {
+                        hasShield = false;
+                        obs.passed = true;
+                        if (slowMotionBalkenCounter > 0) slowMotionBalkenCounter--;
+                        createFloatingText("🛡️ Schild verloren!", orbitX, orbitY - 50);
+                        triggerJuiceEffect('#ffffff');
+                    } else {
+                        triggerGameOver();
+                        return;
+                    }
+                }
+            } // <--- Das schließt den 'else'-Block
+
+            if (success) {
+                obs.passed = true;
+                if (slowMotionBalkenCounter > 0) slowMotionBalkenCounter--;
+                if (!obs.isAutoExploded) {
+                    awardPoints(closestDist, Array.isArray(obs.color) ? obs.color[0] : (obs.color === COLOR_RAINBOW ? '#fff' : obs.color));
+                }
+            }
+            // Der alte else-Block, der hier vorher stand, ist jetzt durch die Logik oben ersetzt.
+        } // <--- Diese Klammer schließt die for (let i = obstacles.length - 1; i >= 0; i--) Schleife
+        
+        if (obs.y > canvas.height + 50) {
+            obstacles.splice(i, 1);
+        }
+    } // <--- Diese Klammer schließt die for-Schleife der Hindernisse
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i];
+        p.x += p.vx * dt * 60; p.y += p.vy * dt * 60; p.alpha -= 1.2 * dt;
+        if (p.alpha <= 0) particles.splice(i, 1);
+    }
+}
+
+function activateItem(effect) {
+    if (effect === ITEM_STAR) {
+        starPowerBalkenCounter = 5; 
+        createFloatingText("🌟 STAR POWER! UNSTERBLICH!", orbitX, orbitY - 50);
+    } else if (effect === ITEM_SLOW) {
+        slowMotionBalkenCounter = 2;
+        createFloatingText("Zeitlupe! ⏳", orbitX, orbitY - 50);
+    } else if (effect === ITEM_SHIELD) {
+        hasShield = true;
+        createFloatingText("Schild aktiv! 🛡️", orbitX, orbitY - 50);
+    } else if (effect === ITEM_CLEAR) {
+        let explodedCount = 0;
+        for (let o of obstacles) {
+            if (explodedCount < 3 && !o.passed) {
+                o.isAutoExploded = true;
+                explodedCount++;
+            }
+        }
+        clearChargeCounter = 3 - explodedCount;
+        createFloatingText("💥 SPRENGUNG!", orbitX, orbitY - 50);
+        for (let j = 0; j < 50; j++) {
+            particles.push({
+                x: Math.random() * canvas.width, y: Math.random() * (canvas.height * 0.6),
+                vx: Math.random() * 10 - 5, vy: Math.random() * 10 - 5,
+                color: '#ff3300', alpha: 1, size: Math.random() * 4 + 2
+            });
+        }
+    }
+}
+
+function awardPoints(closestDist, color) {
+    let earnedPoints = 1; // Basis-Punkt für jeden geclearten Balken
+
+    if (closestDist <= 5) {
+        perfectStreak++;
+        let bonus = 1; // Standard Perfect-Bonus (Streak 1–2)
+
+        if (perfectStreak === 3) {
+            bonus = 3; // +1 Perfect + +2 Triple-Trigger
+            createFloatingText("🔥 Triple Perfect! +2 Bonus!", orbitX, orbitY - 80);
+        } else if (perfectStreak > 3 && perfectStreak < 10) {
+            bonus = 2; // Triple-Zone
+        } else if (perfectStreak === 10) {
+            bonus = 12; // +2 Triple-Zone + +10 Magical-Trigger
+            createFloatingText("✨ MAGICAL PERFECT! +10 Bonus!", orbitX, orbitY - 80);
+        } else if (perfectStreak > 10) {
+            bonus = 3; // Magical-Zone
+        }
+
+        earnedPoints += bonus;
+        createFloatingText(`+${earnedPoints} Perfect! 🎯`, orbitX, orbitY - 50);
+        triggerJuiceEffect(color);
+    } else {
+        perfectStreak = 0;
+    }
+
+    score += earnedPoints;
+    scoreEl.innerText = score;
+}
+
+function createObstacle() {
+    let autoPass = false;
+    if (clearChargeCounter > 0) {
+        clearChargeCounter--;
+        autoPass = true;
+    }
+
+    let type = Math.floor(Math.random() * 3);
+    while (type === lastPattern) {
+        type = Math.floor(Math.random() * 3);
+    }
+    lastPattern = type;
+
+    let gapX = 0; let gapWidth = 54; 
+    if (type === 0) gapX = orbitX - orbitRadius - 12; 
+    else if (type === 1) gapX = orbitX - gapWidth / 2;    
+    else gapX = orbitX + orbitRadius - gapWidth + 12; 
+
+    let obstacleColor = COLOR_PINK;
+    let obstacleType = 'NORMAL';
+    let gapX2 = 0, gapWidth2 = 54;
+    let gapX3 = 0, gapWidth3 = 58;
+
+    currentRequiredInterval = FIXED_INTERVAL;
+
+    let pool = [COLOR_PINK, COLOR_CYAN];
+    if (score >= 51) pool.push(COLOR_YELLOW);
+    if (score >= 125) pool.push(COLOR_PURPLE); 
+
+    if (score < 12) {
+        obstacleColor = COLOR_PINK;
+    } else {
+        let attempts = 0;
+        while (attempts < 20) {
+            let roll = Math.random();
+            let chosen;
+            obstacleType = 'NORMAL';
+
+            if (score >= 50 && roll < 0.07) {
+                obstacleType = TYPE_BOMB;
+                chosen = '#ff1100';
+                gapX = orbitX + (Math.random() * 80 - 40); 
+            }
+            else if (score >= 41 && roll >= 0.07 && roll < 0.55) {
+                let spawnDual = false;
+                if (score >= 100 && Math.random() < 0.65) spawnDual = true;       
+                else if (score >= 75 && Math.random() < 0.40) spawnDual = true;  
+                else if (score < 75 && Math.random() < 0.20) spawnDual = true;   
+
+                if (spawnDual) {
+                    if (score >= 60 && Math.random() < 0.30) {
+                        obstacleType = TYPE_TRIPLE_GAP;
+                        chosen = [COLOR_CYAN, COLOR_YELLOW, COLOR_PINK];
+                        gapWidth = 58; gapWidth2 = 58; gapWidth3 = 58;
+                        gapX = orbitX - orbitRadius - 29;
+                        gapX2 = orbitX - 29;
+                        gapX3 = orbitX + orbitRadius - 29;
+                    } else {
+                    obstacleType = TYPE_DUAL_GAP;
+                    if (score >= 125 && Math.random() > 0.5) {
+                        chosen = Math.random() > 0.5 ? [COLOR_YELLOW, COLOR_PURPLE] : [COLOR_PURPLE, COLOR_YELLOW];
+                    } else {
+                        chosen = Math.random() > 0.5 ? [COLOR_PINK, COLOR_CYAN] : [COLOR_CYAN, COLOR_PINK];
+                    }
+                    gapWidth = 58; gapWidth2 = 58;
+                    gapX = orbitX - orbitRadius - (gapWidth / 2);
+                    gapX2 = orbitX + orbitRadius - (gapWidth2 / 2);
+                    }
+                } else {
+                    chosen = pool[Math.floor(Math.random() * pool.length)];
+                }
+            } else if (score >= 72 && roll >= 0.55 && roll < 0.62) { 
+                chosen = COLOR_RAINBOW;
+            } else if (score >= 27 && roll >= 0.62 && roll < 0.70) { 
+                let numColors = (score >= 125) ? 3 : 2;
+                let colorsShuffled = [...pool].sort(() => 0.5 - Math.random());
+                chosen = colorsShuffled.slice(0, numColors);
+            } else {
+                chosen = pool[Math.floor(Math.random() * pool.length)];
+            }
+
+            let currentStr = Array.isArray(chosen) ? chosen.join("-") : chosen;
+            if (currentStr === lastColorStr && colorStreakCount >= 2 && pool.length > 1) {
+                attempts++;
+                continue; 
+            }
+
+            obstacleColor = chosen;
+            if (currentStr === lastColorStr) {
+                colorStreakCount++;
+            } else {
+                colorStreakCount = 1;
+                lastColorStr = currentStr;
+            }
+            break;
+        }
+    }
+
+    if (obstacleType === TYPE_DUAL_GAP) {
+        currentRequiredInterval = FIXED_INTERVAL + 450;
+    } else if (obstacleType === TYPE_TRIPLE_GAP) {
+        currentRequiredInterval = FIXED_INTERVAL + 750;
+    } else if (obstacleType === TYPE_BOMB) {
+        currentRequiredInterval = FIXED_INTERVAL + 300;
+    }
+
+    // --- ITEM SPAWN SYSTEM ---
+    if (itemCooldownBalken > 0) {
+        itemCooldownBalken--;
+    }
+
+    // KORREKTUR: Frequenz auf mathematisch exakte 28% eingestellt (Gerundete 27,5%)
+    if (score >= 8 && itemCooldownBalken === 0 && Math.random() < 0.28) { 
+        let itemX = orbitX + (Math.random() * 120 - 60);
+        let itemColor = pool[Math.floor(Math.random() * pool.length)];
+        
+        let itemEffect = ITEM_SLOW;
+        let rarityRoll = Math.random();
+        
+        if (rarityRoll < 0.10) itemEffect = ITEM_SHIELD;
+        else if (rarityRoll < 0.30) itemEffect = ITEM_STAR;  
+        else if (rarityRoll < 0.60) itemEffect = ITEM_CLEAR; 
+        else itemEffect = ITEM_SLOW;  
+
+        items.push({
+            x: itemX, 
+            y: -400, // Beibehalten: Startet fair und sichtbar weiter unten
+            color: itemColor, effect: itemEffect,
+            rotation: Math.random() * Math.PI, size: 24
+        });
+
+        itemCooldownBalken = 10;
+    }
+
+    obstacles.push({
+        y: -120, gapX: gapX, gapWidth: gapWidth, height: 35,
+        color: obstacleColor, passed: false, type: obstacleType,
+        isAutoExploded: autoPass,
+        gapX2: gapX2, gapWidth2: gapWidth2,
+        gapX3: gapX3, gapWidth3: gapWidth3,
+        _dual1Checked: false, _dual1Passed: false,
+        _dual2Checked: false, _dual2Passed: false,
+    });
+}
+
+function getDistanceToGapEdges(sx, gx, gw) {
+    let distToLeft = (sx - sphereRadius) - gx;
+    let distToRight = (gx + gw) - (sx + sphereRadius);
+    return Math.min(distToLeft, distToRight);
+}
+
+function getTargetCoordinates(color, px, py, cx, cy, yx, yy, bx, by) {
+    if (color === COLOR_PINK) return {x: px, y: py};
+    if (color === COLOR_CYAN) return {x: cx, y: cy};
+    if (color === COLOR_YELLOW) return {x: yx, y: yy};
+    return {x: bx, y: by}; 
+}
+
+function triggerJuiceEffect(color) {
+    let particleColor = color; 
+    for (let i = 0; i < 10; i++) {
+        particles.push({
+            x: orbitX + (Math.random() * 40 - 20), y: orbitY,
+            vx: (Math.random() * 6 - 3), vy: (Math.random() * -3 - 1),
+            color: particleColor, alpha: 1, size: Math.random() * 3 + 2
+        });
+    }
+}
+
+function triggerGameOver() {
+    gameOver = true; isDragging = false;
+    if (score > highscore) {
+        highscore = score;
+        localStorage.setItem('orbit_highscore_v46', highscore);
+        highscoreEl.innerText = highscore;
+    }
+    for (let i = 0; i < 60; i++) {
+        particles.push({
+            x: orbitX + (Math.random() * 30 - 15), y: orbitY + (Math.random() * 30 - 15),
+            vx: (Math.random() * 12 - 6), vy: (Math.random() * 12 - 6),
+            color: Math.random() > 0.5 ? COLOR_PINK : COLOR_CYAN, alpha: 1, size: Math.random() * 5 + 2
+        });
+    }
+}
+
+function createFloatingText(text, x, y) {
+    const div = document.createElement('div');
+    div.className = 'bonus-text';
+    div.innerText = text;
+    div.style.left = canvas.offsetLeft + x - 70 + 'px';
+    div.style.top = canvas.offsetTop + y + 'px';
+    document.body.appendChild(div);
+    setTimeout(() => div.remove(), 600);
+}
+
+function drawZebraBlock(x, y, width, height, colors) {
+    if (width <= 0 || height <= 0) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, width, height);
+    ctx.clip();
+
+    ctx.fillStyle = '#0d0d12';
+    ctx.fillRect(x, y, width, height);
+
+    let stripeWidth = 26;
+    ctx.lineWidth = stripeWidth + 1;
+    let startX = x - height;
+    let i = 0;
+    while (startX < x + width + height) {
+        let color = colors[i % colors.length];
+        ctx.strokeStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(startX, y - 1);
+        ctx.lineTo(startX + height + 2, y + height + 1);
+        ctx.stroke();
+        startX += stripeWidth;
+        i++;
+    }
+    ctx.restore();
+}
+
+function drawItem(item) {
+    ctx.save();
+    ctx.translate(item.x, item.y);
+    ctx.rotate(item.rotation);
+    
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = item.color;
+    ctx.fillStyle = '#0f1015';
+    ctx.strokeStyle = item.color;
+    ctx.lineWidth = 3;
+    
+    ctx.beginPath();
+    ctx.rect(-item.size/2, -item.size/2, item.size, item.size);
+    ctx.fill();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    ctx.rotate(-item.rotation); 
+    ctx.fillStyle = item.color;
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    let icon = "⚡"; 
+    if (item.effect === ITEM_SLOW) icon = "⏳";
+    if (item.effect === ITEM_SHIELD) icon = "🛡️";
+    if (item.effect === ITEM_CLEAR) icon = "💥";
+    
+    ctx.fillText(icon, 0, 1);
+    ctx.restore();
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#0a0a0f'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    obstacles.forEach(obs => {
+        if (obs.type === TYPE_BOMB) {
+            if (!obs.passed) {
+                ctx.save();
+                let pulse = Math.abs(Math.sin(Date.now() / 120));
+                let bombY = obs.y + obs.height / 2;
+                let bombRadius = 13;
+
+                // Dünne Gefahrenlinie
+                ctx.setLineDash([5, 5]);
+                ctx.strokeStyle = `rgba(255, 100, 0, ${0.25 + pulse * 0.35})`;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(obs.gapX, obs.y - 30);
+                ctx.lineTo(obs.gapX, obs.y + obs.height + 30);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Bombenkörper
+                ctx.beginPath();
+                ctx.arc(obs.gapX, bombY, bombRadius, 0, Math.PI * 2);
+                ctx.fillStyle = '#111111';
+                ctx.shadowBlur = 10 + pulse * 10;
+                ctx.shadowColor = '#ff5500';
+                ctx.fill();
+                ctx.strokeStyle = '#ff6600';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+
+                // Zündschnur
+                ctx.beginPath();
+                ctx.moveTo(obs.gapX + 7, bombY - bombRadius + 2);
+                ctx.quadraticCurveTo(obs.gapX + 15, bombY - bombRadius - 7, obs.gapX + 9, bombY - bombRadius - 13);
+                ctx.strokeStyle = '#996633';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Funken
+                ctx.beginPath();
+                ctx.arc(obs.gapX + 9, bombY - bombRadius - 13, 3, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255, ${Math.floor(180 + pulse * 75)}, 0, ${0.6 + pulse * 0.4})`;
+                ctx.fill();
+
+                ctx.restore();
+            }
+            return;
+        }
+
+        if (obs.passed || obs.isAutoExploded) {
+            ctx.fillStyle = '#1a1a1e';
+            ctx.fillRect(0, obs.y, obs.gapX, obs.height);
+            if (obs.type === TYPE_TRIPLE_GAP) {
+                ctx.fillRect(obs.gapX + obs.gapWidth, obs.y, obs.gapX2 - (obs.gapX + obs.gapWidth), obs.height);
+                ctx.fillRect(obs.gapX2 + obs.gapWidth2, obs.y, obs.gapX3 - (obs.gapX2 + obs.gapWidth2), obs.height);
+                ctx.fillRect(obs.gapX3 + obs.gapWidth3, obs.y, canvas.width - (obs.gapX3 + obs.gapWidth3), obs.height);
+            } else if (obs.type === TYPE_DUAL_GAP) {
+                ctx.fillRect(obs.gapX + obs.gapWidth, obs.y, obs.gapX2 - (obs.gapX + obs.gapWidth), obs.height);
+                ctx.fillRect(obs.gapX2 + obs.gapWidth2, obs.y, canvas.width - (obs.gapX2 + obs.gapWidth2), obs.height);
+            } else {
+                ctx.fillRect(obs.gapX + obs.gapWidth, obs.y, canvas.width - (obs.gapX + obs.gapWidth), obs.height);
+            }
+            ctx.strokeStyle = '#2a2a30'; ctx.lineWidth = 1;
+            ctx.strokeRect(0, obs.y, obs.gapX, obs.height);
+            if (obs.type === TYPE_TRIPLE_GAP) {
+                ctx.strokeRect(obs.gapX + obs.gapWidth, obs.y, obs.gapX2 - (obs.gapX + obs.gapWidth), obs.height);
+                ctx.strokeRect(obs.gapX2 + obs.gapWidth2, obs.y, obs.gapX3 - (obs.gapX2 + obs.gapWidth2), obs.height);
+                ctx.strokeRect(obs.gapX3 + obs.gapWidth3, obs.y, canvas.width - (obs.gapX3 + obs.gapWidth3), obs.height);
+            } else if (obs.type === TYPE_DUAL_GAP) {
+                ctx.strokeRect(obs.gapX + obs.gapWidth, obs.y, obs.gapX2 - (obs.gapX + obs.gapWidth), obs.height);
+                ctx.strokeRect(obs.gapX2 + obs.gapWidth2, obs.y, canvas.width - (obs.gapX2 + obs.gapWidth2), obs.height);
+            } else {
+                ctx.strokeRect(obs.gapX + obs.gapWidth, obs.y, canvas.width - (obs.gapX + obs.gapWidth), obs.height);
+            }
+        } else if (obs.type === TYPE_TRIPLE_GAP) {
+            ctx.fillStyle = '#16161f';
+            ctx.fillRect(0, obs.y, obs.gapX, obs.height);
+            ctx.fillRect(obs.gapX + obs.gapWidth, obs.y, obs.gapX2 - (obs.gapX + obs.gapWidth), obs.height);
+            ctx.fillRect(obs.gapX2 + obs.gapWidth2, obs.y, obs.gapX3 - (obs.gapX2 + obs.gapWidth2), obs.height);
+            ctx.fillRect(obs.gapX3 + obs.gapWidth3, obs.y, canvas.width - (obs.gapX3 + obs.gapWidth3), obs.height);
+
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = obs.color[0];
+            ctx.strokeRect(0, obs.y, obs.gapX, obs.height);
+            ctx.strokeStyle = '#3a3a4a';
+            ctx.strokeRect(obs.gapX + obs.gapWidth, obs.y, obs.gapX2 - (obs.gapX + obs.gapWidth), obs.height);
+            ctx.strokeRect(obs.gapX2 + obs.gapWidth2, obs.y, obs.gapX3 - (obs.gapX2 + obs.gapWidth2), obs.height);
+            ctx.strokeStyle = obs.color[2];
+            ctx.strokeRect(obs.gapX3 + obs.gapWidth3, obs.y, canvas.width - (obs.gapX3 + obs.gapWidth3), obs.height);
+        } else if (obs.type === TYPE_DUAL_GAP) {
+            ctx.fillStyle = '#16161f';
+            ctx.fillRect(0, obs.y, obs.gapX, obs.height);
+            ctx.fillRect(obs.gapX + obs.gapWidth, obs.y, obs.gapX2 - (obs.gapX + obs.gapWidth), obs.height);
+            ctx.fillRect(obs.gapX2 + obs.gapWidth2, obs.y, canvas.width - (obs.gapX2 + obs.gapWidth2), obs.height);
+
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = obs.color[0];
+            ctx.strokeRect(0, obs.y, obs.gapX, obs.height);
+            ctx.strokeStyle = '#3a3a4a';
+            ctx.strokeRect(obs.gapX + obs.gapWidth, obs.y, obs.gapX2 - (obs.gapX + obs.gapWidth), obs.height);
+            ctx.strokeStyle = obs.color[1];
+            ctx.strokeRect(obs.gapX2 + obs.gapWidth2, obs.y, canvas.width - (obs.gapX2 + obs.gapWidth2), obs.height);
+        } else if (obs.color === COLOR_RAINBOW) {
+            let gradient1 = ctx.createLinearGradient(0, obs.y, obs.gapX, obs.y);
+            gradient1.addColorStop(0, '#ff007f'); gradient1.addColorStop(0.5, '#00f2fe'); gradient1.addColorStop(1, '#ffcc00');
+            ctx.fillStyle = '#16161f'; ctx.fillRect(0, obs.y, obs.gapX, obs.height);
+            ctx.strokeStyle = gradient1; ctx.lineWidth = 4; ctx.strokeRect(0, obs.y, obs.gapX, obs.height);
+
+            let gradient2 = ctx.createLinearGradient(obs.gapX + obs.gapWidth, obs.y, canvas.width, obs.y);
+            gradient2.addColorStop(0, '#ffcc00'); gradient2.addColorStop(0.5, '#ff007f'); gradient2.addColorStop(1, '#00f2fe');
+            ctx.fillRect(obs.gapX + obs.gapWidth, obs.y, canvas.width - (obs.gapX + obs.gapWidth), obs.height);
+            ctx.strokeStyle = gradient2; ctx.strokeRect(obs.gapX + obs.gapWidth, obs.y, canvas.width - (obs.gapX + obs.gapWidth), obs.height);
+        } else if (Array.isArray(obs.color)) {
+            ctx.fillStyle = '#16161f';
+            ctx.fillRect(0, obs.y, obs.gapX, obs.height); 
+            ctx.fillRect(obs.gapX + obs.gapWidth, obs.y, canvas.width - (obs.gapX + obs.gapWidth), obs.height);
+            
+            // Jetzt beide Seiten explizit zeichnen:
+            drawZebraBlock(0, obs.y, obs.gapX, obs.height, obs.color);
+            drawZebraBlock(obs.gapX + obs.gapWidth, obs.y, canvas.width - (obs.gapX + obs.gapWidth), obs.height, obs.color);
+        } else {
+            ctx.fillStyle = '#16161f';
+            ctx.fillRect(0, obs.y, obs.gapX, obs.height); ctx.fillRect(obs.gapX + obs.gapWidth, obs.y, canvas.width - (obs.gapX + obs.gapWidth), obs.height);
+            ctx.strokeStyle = obs.color; ctx.lineWidth = 3;
+            ctx.strokeRect(0, obs.y, obs.gapX, obs.height); ctx.strokeRect(obs.gapX + obs.gapWidth, obs.y, canvas.width - (obs.gapX + obs.gapWidth), obs.height);
+        }
+    });
+
+    items.forEach(item => drawItem(item));
+
+    const pX = orbitX + Math.cos(orbitAngle) * orbitRadius;
+    const pY = orbitY + Math.sin(orbitAngle) * orbitRadius;
+    const yX = orbitX + Math.cos(orbitAngle + Math.PI / 2) * orbitRadius;
+    const yY = orbitY + Math.sin(orbitAngle + Math.PI / 2) * orbitRadius;
+    const cX = orbitX + Math.cos(orbitAngle + Math.PI) * orbitRadius;
+    const cY = orbitY + Math.sin(orbitAngle + Math.PI) * orbitRadius;
+    const bX = orbitX + Math.cos(orbitAngle + Math.PI * 1.5) * orbitRadius;
+    const bY = orbitY + Math.sin(orbitAngle + Math.PI * 1.5) * orbitRadius;
+
+    if (hasShield && !gameOver) {
+        ctx.beginPath(); ctx.arc(orbitX, orbitY, orbitRadius + 20, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)'; ctx.lineWidth = 2; ctx.stroke();
+    }
+
+    if (!gameOver) {
+        // --- BLINK-LOGIK NUR HIER EINFÜGEN ---
+        let blink = (starPowerBalkenCounter > 0) ? (Math.sin(Date.now() / 80) * 0.4 + 0.6) : 1.0;
+        ctx.globalAlpha = blink;
+
+        let fillPink = COLOR_PINK, fillCyan = COLOR_CYAN, fillYellow = COLOR_YELLOW, fillPurple = COLOR_PURPLE;
+
+        ctx.beginPath(); ctx.arc(pX, pY, sphereRadius, 0, Math.PI * 2);
+        ctx.fillStyle = fillPink; ctx.shadowBlur = (starPowerBalkenCounter > 0) ? 20 : 10; ctx.shadowColor = fillPink; ctx.fill();
+
+        ctx.beginPath(); ctx.arc(cX, cY, sphereRadius, 0, Math.PI * 2);
+        ctx.fillStyle = (score >= 12 || starPowerBalkenCounter > 0) ? fillCyan : 'rgba(255,255,255,0.01)';
+        ctx.shadowColor = fillCyan; ctx.fill();
+
+        ctx.beginPath(); ctx.arc(yX, yY, sphereRadius, 0, Math.PI * 2);
+        ctx.fillStyle = (score >= 51 || starPowerBalkenCounter > 0) ? fillYellow : 'rgba(255,255,255,0.01)';
+        ctx.shadowColor = fillYellow; ctx.fill();
+
+        ctx.beginPath(); ctx.arc(bX, bY, sphereRadius, 0, Math.PI * 2);
+        ctx.fillStyle = (score >= 125 || starPowerBalkenCounter > 0) ? fillPurple : 'rgba(255,255,255,0.01)';
+        ctx.shadowColor = fillPurple; ctx.fill();
+        
+        ctx.globalAlpha = 1.0; // WICHTIG: Hier setzen wir Alpha zurück
+        ctx.shadowBlur = 0; 
+    }
+
+    particles.forEach(p => {
+        ctx.fillStyle = p.color; ctx.globalAlpha = p.alpha; ctx.fillRect(p.x, p.y, p.size, p.size);
+    });
+    ctx.globalAlpha = 1.0;
+
+    if (gameOver) {
+        ctx.fillStyle = 'rgba(10, 10, 15, 0.92)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#ffffff'; ctx.font = 'bold 24px Segoe UI'; ctx.textAlign = 'center';
+        ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 20);
+        ctx.fillStyle = '#45f3ff'; ctx.font = '18px Segoe UI';
+        ctx.fillText('Bildschirm berühren für Neustart', canvas.width / 2, canvas.height / 2 + 20);
+    }
+}
+
+function loop() { update(); draw(); requestAnimationFrame(loop); }
+loop();
+
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js');
+}
+</script>
+</body>
+</html>
