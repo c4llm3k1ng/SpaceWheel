@@ -1236,6 +1236,7 @@ async function registerUser(username, password) {
     batch.set(fbDb.collection('usernames').doc(username.toLowerCase()), { uid });
     batch.set(fbDb.collection('friendCodes').doc(friendCode), { uid });
     await batch.commit();
+    fbUserData = { username, friendCode, highscore: 0, friends: [] };
 }
 
 async function loginUser(username, password) {
