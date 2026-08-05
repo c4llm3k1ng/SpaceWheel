@@ -1,7 +1,7 @@
 {
-    "name": "Orbit-Sync",
-    "short_name": "Orbit-Sync",
-    "description": "Manövriere die Kugeln durch die Lücken!",
+    "name": "Space Wheel",
+    "short_name": "Space Wheel",
+    "description": "Drehe das Rad und führe die Kugeln durch die Lücken!",
     "lang": "de",
     "start_url": "./SpaceWheel.html",
     "display": "standalone",
