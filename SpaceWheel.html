@@ -1341,6 +1341,16 @@ function draw() {
     const bX = orbitX + Math.cos(orbitAngle + Math.PI * 1.5) * orbitRadius;
     const bY = orbitY + Math.sin(orbitAngle + Math.PI * 1.5) * orbitRadius;
 
+    if (!gameOver) {
+        // Leuchtende Kreisbahn im Neon-Look des App-Icons
+        ctx.beginPath(); ctx.arc(orbitX, orbitY, orbitRadius, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(0, 242, 254, 0.22)';
+        ctx.lineWidth = 2;
+        ctx.shadowBlur = 14; ctx.shadowColor = COLOR_CYAN;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+    }
+
     if (hasShield && !gameOver) {
         ctx.beginPath(); ctx.arc(orbitX, orbitY, orbitRadius + 20, 0, Math.PI * 2);
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)'; ctx.lineWidth = 2; ctx.stroke();
