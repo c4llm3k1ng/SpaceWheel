@@ -434,7 +434,7 @@ highscoreEl.innerText = highscore;
 
 let gameOver = false;
 let lastTime = performance.now();
-let gamePaused = false;
+let gamePaused = true; // Start pausiert: erst nach Login/Gast-Wahl läuft das Spiel
 let tutorialTestActive = false;
 let tutorialNoSpawn = false;
 let tutorialItemBoost = false;
@@ -1611,7 +1611,7 @@ let audioCtx = null, musicMaster = null, sfxMaster = null;
 let musicDelay = null, musicDelayGain = null, noiseBuf = null;
 let musicTimer = null, eighthCount = 0, nextEighthTime = 0;
 const MUSIC_BPM = 150;
-const MUSIC_TRANSPOSE = -2; // Halbtöne; 0 = A-Moll, -2 = G-Moll
+const MUSIC_TRANSPOSE = 0; // Halbtöne; 0 = A-Moll, -2 = G-Moll
 const STEP16 = 60 / MUSIC_BPM / 4;
 const EIGHTH = STEP16 * 2;
 // 4 Akkorde à 2 Takte — dunkle absteigende Kadenz: Am – G – F – E
@@ -1635,7 +1635,7 @@ function ensureAudioCtx() {
     if (audioCtx) return;
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     musicMaster = audioCtx.createGain();
-    musicMaster.gain.value = 0.22;
+    musicMaster.gain.value = 0;
     musicMaster.connect(audioCtx.destination);
     sfxMaster = audioCtx.createGain();
     sfxMaster.gain.value = 0.5;
@@ -1663,7 +1663,6 @@ function ensureMusicStarted() {
     if (!musicEnabled) return;
     ensureAudioCtx();
     if (audioCtx.state === 'suspended') audioCtx.resume();
-    musicMaster.gain.setTargetAtTime(0.22, audioCtx.currentTime, 0.1);
     if (!musicTimer) {
         eighthCount = 0;
         nextEighthTime = audioCtx.currentTime + 0.1;
@@ -1678,9 +1677,13 @@ function stopMusic() {
 }
 
 function scheduleMusic() {
-    // In Menüs/Pausen leiser weiterlaufen lassen
-    const target = (gamePaused || gameOver) ? 0.07 : 0.22;
-    musicMaster.gain.setTargetAtTime(target, audioCtx.currentTime, 0.4);
+    // Musik läuft nur im aktiven Spiel — in Menüs und bei Game Over ausblenden
+    if (gamePaused || gameOver) {
+        musicMaster.gain.setTargetAtTime(0, audioCtx.currentTime, 0.12);
+        nextEighthTime = audioCtx.currentTime + 0.1;
+        return;
+    }
+    musicMaster.gain.setTargetAtTime(0.22, audioCtx.currentTime, 0.3);
     while (nextEighthTime < audioCtx.currentTime + 0.25) {
         playStep(eighthCount, nextEighthTime);
         eighthCount = (eighthCount + 1) % 128;
