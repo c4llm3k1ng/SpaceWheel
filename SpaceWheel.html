@@ -334,6 +334,10 @@
                 <div><div class="help-name">Triple</div><div class="help-desc">Drei Balken gleichzeitig – noch enger, aber gleiches Prinzip.</div></div>
             </div>
             <div class="help-item">
+                <div class="help-icon">🦓</div>
+                <div><div class="help-name">Zebra</div><div class="help-desc">Gestreifter Balken für mehrere Farben. Eine der passenden Kugeln muss durch die Lücke.</div></div>
+            </div>
+            <div class="help-item">
                 <div class="help-icon">💣</div>
                 <div><div class="help-name">Bombe</div><div class="help-desc">Kein Balken, aber eine Bombe. Berühre sie nicht! Mit einem Schild überstehst du den Treffer.</div></div>
             </div>
@@ -407,6 +411,7 @@ let gamePaused = false;
 let tutorialTestActive = false;
 let tutorialNoSpawn = false;
 let tutorialItemBoost = false;
+let tutorialForceType = null;
 let tutSavedState = null;
 
 const orbitX = canvas.width / 2;
@@ -569,6 +574,7 @@ function update() {
     const settings = getLevelSettings(score);
 
     let currentSpeed = settings.speed;
+    if (tutorialTestActive) currentSpeed = Math.min(currentSpeed, 330);
     const prevStarPower = starPowerTimer;
     if (starPowerTimer > 0) starPowerTimer = Math.max(0, starPowerTimer - dt);
     if (slowMotionTimer > 0) slowMotionTimer = Math.max(0, slowMotionTimer - dt);
@@ -954,6 +960,41 @@ function createObstacle() {
 
     currentRequiredInterval = FIXED_INTERVAL;
 
+    // Tutorial-Test: erzwungener Hindernis-Typ, ohne Items (früher Return)
+    if (tutorialForceType) {
+        if (tutorialForceType === 'SINGLE') {
+            let tPool = [COLOR_PINK];
+            if (score >= 12) tPool.push(COLOR_CYAN);
+            if (score >= 51) tPool.push(COLOR_YELLOW);
+            if (score >= 125) tPool.push(COLOR_PURPLE);
+            obstacleColor = tPool[Math.floor(Math.random() * tPool.length)];
+        } else if (tutorialForceType === 'DUAL') {
+            obstacleType = TYPE_DUAL_GAP;
+            obstacleColor = Math.random() > 0.5 ? [COLOR_PINK, COLOR_CYAN] : [COLOR_CYAN, COLOR_PINK];
+            gapWidth = 58; gapWidth2 = 58;
+            gapX = orbitX - orbitRadius - (gapWidth / 2);
+            gapX2 = orbitX + orbitRadius - (gapWidth2 / 2);
+            currentRequiredInterval = FIXED_INTERVAL + 450;
+        } else if (tutorialForceType === 'ZEBRA') {
+            obstacleColor = Math.random() > 0.5 ? [COLOR_PINK, COLOR_CYAN] : [COLOR_CYAN, COLOR_PINK];
+        } else if (tutorialForceType === 'BOMB') {
+            obstacleType = TYPE_BOMB;
+            obstacleColor = '#ff1100';
+            gapX = orbitX + (Math.random() * 80 - 40);
+            currentRequiredInterval = FIXED_INTERVAL + 300;
+        }
+        obstacles.push({
+            y: -120, gapX: gapX, gapWidth: gapWidth, height: 35,
+            color: obstacleColor, passed: false, type: obstacleType,
+            isAutoExploded: autoPass,
+            gapX2: gapX2, gapWidth2: gapWidth2,
+            gapX3: gapX3, gapWidth3: gapWidth3,
+            _dual1Checked: false, _dual1Passed: false,
+            _dual2Checked: false, _dual2Passed: false,
+        });
+        return;
+    }
+
     let pool = [COLOR_PINK, COLOR_CYAN];
     if (score >= 51) pool.push(COLOR_YELLOW);
     if (score >= 125) pool.push(COLOR_PURPLE); 
@@ -1041,7 +1082,7 @@ function createObstacle() {
     }
 
     // KORREKTUR: Frequenz auf mathematisch exakte 28% eingestellt (Gerundete 27,5%)
-    if ((score >= 8 || tutorialItemBoost) && itemCooldownBalken === 0 && (tutorialItemBoost || Math.random() < 0.28)) {
+    if ((!tutorialTestActive || tutorialItemBoost) && (score >= 8 || tutorialItemBoost) && itemCooldownBalken === 0 && (tutorialItemBoost || Math.random() < 0.28)) {
         let itemX = orbitX + (Math.random() * 120 - 60);
         let itemPool = [COLOR_PINK];
         if (score >= 12) itemPool.push(COLOR_CYAN);
@@ -1490,12 +1531,28 @@ function closeHelp() {
 
 // ── Tutorial ────────────────────────────────────────────────
 const TUTORIAL_SLIDES = [
-    { icon: '🎮', title: 'Das Rad steuern', text: 'Wische links oder rechts über den Bildschirm, um das Rad zu drehen.\nAm Desktop: Pfeiltasten ← und →' },
-    { icon: '🔴', title: 'Deine Kugeln', text: 'Pink ist von Anfang an dabei. Cyan kommt bei Score 12, Gelb bei 51 und Lila bei 125 dazu.' },
-    { icon: '⬛', title: 'Die Balken', text: 'Balken fallen von oben. Positioniere das Rad so, dass deine Kugeln durch die Lücken passen – sonst ist das Spiel vorbei!' },
-    { icon: '🎯', title: 'Risky Bonus', text: 'Wenn du sehr nah am Rand einer Lücke bleibst, gibt es +2 statt +1 Punkt.\n3 Riskys hintereinander = Triple Risky (+2 Bonus)!\n10 in Folge = Magical Risky (+10 Bonus)!' },
-    { icon: '✨', title: 'Items', text: '🌟 Star Immunity · ⏳ Zeitlupe\n🛡️ Schild · 💥 Sprengung · ↔ Breite Lücken\n\nFliege durch sie hindurch um sie zu aktivieren.' },
-    { icon: '🚀', title: 'Los geht\'s!', text: 'Erreiche hohe Scores und schlage deine Freunde in der Bestenliste.\n\nViel Erfolg!' }
+    { icon: '🎮', title: 'Das Rad steuern', text: 'Wische links oder rechts über den Bildschirm, um das Rad zu drehen.\nAm Desktop: Pfeiltasten ← und →',
+      test: { score: 0, noSpawn: true } },
+    { icon: '⬛', title: 'Die Balken', text: 'Balken fallen von oben. Positioniere das Rad so, dass deine Kugel durch die Lücke passt – sonst ist das Spiel vorbei!',
+      test: { score: 0, force: 'SINGLE' } },
+    { icon: '🎯', title: 'Risky Bonus', text: 'Wenn du sehr nah am Rand einer Lücke bleibst, gibt es +2 statt +1 Punkt.\n3 Riskys hintereinander = Triple Risky (+2 Bonus)!\n10 in Folge = Magical Risky (+10 Bonus)!',
+      test: { score: 0, force: 'SINGLE' } },
+    { icon: '🔵', title: 'Zwei Farben', text: 'Ab Score 12 kommt die Cyan-Kugel dazu. Jeder Balken hat eine Farbe – die Kugel mit der passenden Farbe muss durch die Lücke.',
+      test: { score: 12, force: 'SINGLE' } },
+    { icon: '🌟', title: 'Drei Farben', text: 'Ab Score 51 kommt Gelb dazu. Behalte alle Kugeln im Blick und drehe die richtige Kugel zur Lücke!',
+      test: { score: 51, force: 'SINGLE' } },
+    { icon: '🟣', title: 'Vier Farben', text: 'Ab Score 125 vervollständigt Lila das Rad. Jetzt zählt jede Vierteldrehung!',
+      test: { score: 125, force: 'SINGLE' } },
+    { icon: '👥', title: 'Doppel-Balken', text: 'Zwei Balken mit zwei Lücken gleichzeitig. Es reicht, wenn eine passende Kugel durch ihre Lücke kommt.',
+      test: { score: 12, force: 'DUAL' } },
+    { icon: '🦓', title: 'Zebra-Balken', text: 'Gestreifte Balken gelten für mehrere Farben gleichzeitig. Auch hier reicht es, wenn eine der passenden Kugeln die Lücke trifft.',
+      test: { score: 27, force: 'ZEBRA' } },
+    { icon: '💣', title: 'Bomben', text: 'Statt eines Balkens fällt eine Bombe. Weiche ihr mit allen Kugeln aus – eine Berührung bedeutet Game Over (außer du hast ein Schild).',
+      test: { score: 12, force: 'BOMB' } },
+    { icon: '✨', title: 'Items', text: '🌟 Star Immunity · ⏳ Zeitlupe\n🛡️ Schild · 💥 Sprengung · ↔ Breite Lücken\n\nFliege durch sie hindurch um sie zu aktivieren.',
+      test: { score: 10, itemBoost: true } },
+    { icon: '🚀', title: 'Los geht\'s!', text: 'Erreiche hohe Scores und schlage deine Freunde in der Bestenliste.\n\nViel Erfolg!',
+      test: null }
 ];
 let tutorialStep = 0;
 
@@ -1546,21 +1603,12 @@ function tutorialTry() {
     starPowerTimer = 0; wideGapTimer = 0; itemCooldownBalken = 0;
     lastPattern = -1; lastColorStr = ''; colorStreakCount = 0; perfectStreak = 0;
     currentRequiredInterval = FIXED_INTERVAL;
-    tutorialNoSpawn = false;
-    tutorialItemBoost = false;
-
-    // Szenario je Tutorial-Schritt
-    if (tutorialStep === 0) {          // Steuerung: freies Drehen ohne Hindernisse
-        score = 0; tutorialNoSpawn = true;
-    } else if (tutorialStep === 1) {   // Kugeln: alle vier sichtbar, keine Balken
-        score = 125; tutorialNoSpawn = true;
-    } else if (tutorialStep === 2) {   // Balken: einfache pinke Balken im Startempo
-        score = 0;
-    } else if (tutorialStep === 3) {   // Risky: einfache Balken zum Rand-Streifen
-        score = 0;
-    } else if (tutorialStep === 4) {   // Items: bei jedem Balken erscheint ein Item
-        score = 10; tutorialItemBoost = true;
-    }
+    // Szenario aus der Slide-Konfiguration laden
+    const cfg = TUTORIAL_SLIDES[tutorialStep].test || {};
+    score = cfg.score || 0;
+    tutorialNoSpawn = !!cfg.noSpawn;
+    tutorialItemBoost = !!cfg.itemBoost;
+    tutorialForceType = cfg.force || null;
     scoreEl.innerText = score;
     spawnTimer = tutorialNoSpawn ? 0 : 9999;
 
@@ -1592,6 +1640,7 @@ function tutorialRestoreState() {
     tutorialTestActive = false;
     tutorialNoSpawn = false;
     tutorialItemBoost = false;
+    tutorialForceType = null;
 }
 function tutorialResume() {
     tutorialRestoreState();
@@ -1608,7 +1657,7 @@ function renderTutorialSlide() {
     const isLast = tutorialStep === TUTORIAL_SLIDES.length - 1;
     document.getElementById('tut-next-btn').textContent = isLast ? 'Fertig ✓' : 'Weiter →';
     document.getElementById('tut-back-btn').style.visibility = tutorialStep === 0 ? 'hidden' : 'visible';
-    document.getElementById('tut-try-btn').style.display = isLast ? 'none' : 'block';
+    document.getElementById('tut-try-btn').style.display = slide.test ? 'block' : 'none';
     const dots = document.getElementById('tut-dots');
     dots.innerHTML = TUTORIAL_SLIDES.map((_, i) =>
         `<div class="tut-dot${i === tutorialStep ? ' active' : ''}"></div>`
