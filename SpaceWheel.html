@@ -1529,7 +1529,17 @@ function draw() {
     }
 }
 
+let lastMusicGate = null;
 function loop() {
+    // Musik sofort stummschalten, sobald das aktive Spiel endet (Menü, Pause, Game Over)
+    const musicGate = gamePaused || gameOver;
+    if (audioCtx && musicGate !== lastMusicGate) {
+        lastMusicGate = musicGate;
+        if (musicGate) {
+            musicMaster.gain.cancelScheduledValues(audioCtx.currentTime);
+            musicMaster.gain.setTargetAtTime(0, audioCtx.currentTime, 0.05);
+        }
+    }
     if (gamePaused) {
         lastTime = performance.now();
     } else {
