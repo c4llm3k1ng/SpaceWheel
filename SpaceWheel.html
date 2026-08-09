@@ -164,12 +164,12 @@
             border-radius: 999px; padding: 10px 20px; font-size: 14px; font-weight: bold; cursor: pointer;
         }
 
-        #help-screen {
+        #help-screen, #settings-screen {
             display: none; position: fixed; inset: 0; z-index: 300;
             background: #0a0a0f; flex-direction: column; align-items: center;
             overflow-y: auto; padding: 20px 16px 40px;
         }
-        #help-screen.active { display: flex; }
+        #help-screen.active, #settings-screen.active { display: flex; }
         .help-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; width: 100%; max-width: 420px; }
         .help-back { background: #1e1f2e; border: none; color: #fff; width: 38px; height: 38px; border-radius: 50%; font-size: 20px; cursor: pointer; flex-shrink: 0; }
         .help-title-text { font-size: 20px; font-weight: bold; }
@@ -261,7 +261,7 @@
             <button class="ham-item" onclick="closeHamburger(); openHelp()">
                 <span class="ham-icon">❓</span> Hilfe
             </button>
-            <button class="ham-item disabled">
+            <button class="ham-item" onclick="closeHamburger(); openSettings()">
                 <span class="ham-icon">⚙️</span> Einstellungen
             </button>
         </div>
@@ -391,6 +391,21 @@
             <div class="help-item">
                 <div class="help-icon">✨</div>
                 <div><div class="help-name">Magical Risky – +10 Bonus</div><div class="help-desc">10 Riskys hintereinander: großer Bonustreffer!</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Screen -->
+    <div id="settings-screen">
+        <div class="help-header">
+            <button class="help-back" onclick="closeSettings()">←</button>
+            <div class="help-title-text">⚙️ Einstellungen</div>
+        </div>
+        <div class="help-section">
+            <div class="help-item" style="align-items:center;">
+                <div class="help-icon">🎵</div>
+                <div style="flex:1;"><div class="help-name">Hintergrundmusik</div><div class="help-desc">Ruhiger Space-Synth-Loop während des Spielens</div></div>
+                <button id="music-toggle-btn" class="tut-next" onclick="toggleMusic()" style="padding:8px 16px;font-size:13px;">An 🔊</button>
             </div>
         </div>
     </div>
@@ -1555,6 +1570,145 @@ function closeHelp() {
     document.getElementById('help-screen').classList.remove('active');
     openHamburger();
 }
+
+// ── Einstellungen ───────────────────────────────────────────
+function openSettings() {
+    document.getElementById('settings-screen').classList.add('active');
+    document.getElementById('hamburger-btn').style.display = 'none';
+    gamePaused = true;
+    updateMusicToggleLabel();
+}
+function closeSettings() {
+    document.getElementById('settings-screen').classList.remove('active');
+    openHamburger();
+}
+
+// ── Hintergrundmusik (prozedural per Web Audio) ─────────────
+let musicEnabled = localStorage.getItem('sw_music') !== 'off';
+let audioCtx = null, musicMaster = null, musicDelay = null, musicDelayGain = null;
+let musicTimer = null, eighthCount = 0, nextEighthTime = 0;
+const MUSIC_BPM = 96;
+const EIGHTH = 60 / MUSIC_BPM / 2;
+// 4 Akkorde à 2 Takte: Am(add9) – Fmaj7 – Cmaj7 – G6
+const MUSIC_CHORDS = [
+    { bass: 45, pad: [57, 60, 64, 71], arp: [69, 72, 76, 79] },
+    { bass: 41, pad: [53, 57, 60, 64], arp: [65, 69, 72, 76] },
+    { bass: 48, pad: [55, 59, 60, 64], arp: [67, 72, 76, 79] },
+    { bass: 43, pad: [55, 59, 62, 64], arp: [67, 71, 74, 79] }
+];
+const ARP_PATTERN = [0, -1, 1, 2, -1, 3, -1, 2, 0, 2, -1, 1, 3, -1, 2, -1];
+
+function midiFreq(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+
+function ensureMusicStarted() {
+    if (!musicEnabled) return;
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        musicMaster = audioCtx.createGain();
+        musicMaster.gain.value = 0.22;
+        musicMaster.connect(audioCtx.destination);
+        // Echo für das Arpeggio (punktierte Achtel)
+        musicDelay = audioCtx.createDelay(1.0);
+        musicDelay.delayTime.value = EIGHTH * 1.5;
+        musicDelayGain = audioCtx.createGain();
+        musicDelayGain.gain.value = 0.32;
+        musicDelay.connect(musicDelayGain);
+        musicDelayGain.connect(musicDelay);
+        musicDelayGain.connect(musicMaster);
+    }
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    if (!musicTimer) {
+        eighthCount = 0;
+        nextEighthTime = audioCtx.currentTime + 0.1;
+        musicTimer = setInterval(scheduleMusic, 90);
+    }
+}
+
+function stopMusic() {
+    if (!audioCtx) return;
+    if (musicTimer) { clearInterval(musicTimer); musicTimer = null; }
+    musicMaster.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+}
+
+function scheduleMusic() {
+    // In Menüs/Pausen leiser weiterlaufen lassen
+    const target = (gamePaused || gameOver) ? 0.07 : 0.22;
+    musicMaster.gain.setTargetAtTime(target, audioCtx.currentTime, 0.4);
+    while (nextEighthTime < audioCtx.currentTime + 0.25) {
+        playEighth(eighthCount, nextEighthTime);
+        eighthCount = (eighthCount + 1) % 64;
+        nextEighthTime += EIGHTH;
+    }
+}
+
+function playEighth(step, t) {
+    const chord = MUSIC_CHORDS[Math.floor(step / 16) % 4];
+    const si = step % 16;
+    if (si === 0) chord.pad.forEach(n => padVoice(midiFreq(n), t, 16 * EIGHTH));
+    if (si % 4 === 0) bassVoice(midiFreq(chord.bass + (si === 8 ? 12 : 0)), t);
+    const ai = ARP_PATTERN[si];
+    if (ai >= 0) arpVoice(midiFreq(chord.arp[ai]), t, si % 4 === 0 ? 0.09 : 0.06);
+}
+
+function padVoice(freq, t, dur) {
+    [-6, 6].forEach(det => {
+        const o = audioCtx.createOscillator();
+        o.type = 'sawtooth'; o.frequency.value = freq; o.detune.value = det;
+        const f = audioCtx.createBiquadFilter();
+        f.type = 'lowpass'; f.frequency.value = 750; f.Q.value = 0.5;
+        const g = audioCtx.createGain();
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(0.05, t + 1.4);
+        g.gain.setValueAtTime(0.05, t + dur - 1.2);
+        g.gain.linearRampToValueAtTime(0, t + dur);
+        o.connect(f); f.connect(g); g.connect(musicMaster);
+        o.start(t); o.stop(t + dur + 0.1);
+    });
+}
+
+function bassVoice(freq, t) {
+    const o = audioCtx.createOscillator();
+    o.type = 'triangle'; o.frequency.value = freq;
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.16, t + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    o.connect(g); g.connect(musicMaster);
+    o.start(t); o.stop(t + 0.6);
+}
+
+function arpVoice(freq, t, vel) {
+    const o = audioCtx.createOscillator();
+    o.type = 'triangle'; o.frequency.value = freq;
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vel, t + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+    o.connect(g); g.connect(musicMaster); g.connect(musicDelay);
+    o.start(t); o.stop(t + 0.35);
+}
+
+function toggleMusic() {
+    musicEnabled = !musicEnabled;
+    localStorage.setItem('sw_music', musicEnabled ? 'on' : 'off');
+    if (musicEnabled) ensureMusicStarted(); else stopMusic();
+    updateMusicToggleLabel();
+}
+
+function updateMusicToggleLabel() {
+    const b = document.getElementById('music-toggle-btn');
+    b.textContent = musicEnabled ? 'An 🔊' : 'Aus 🔇';
+    b.style.background = musicEnabled ? '#ff007f' : '#2a2b3d';
+}
+
+// Browser erlauben Audio erst nach einer Nutzer-Interaktion
+document.addEventListener('pointerdown', ensureMusicStarted);
+document.addEventListener('keydown', ensureMusicStarted);
+document.addEventListener('visibilitychange', () => {
+    if (!audioCtx) return;
+    if (document.hidden) audioCtx.suspend();
+    else if (musicEnabled) audioCtx.resume();
+});
 
 // ── Tutorial ────────────────────────────────────────────────
 const TUTORIAL_SLIDES = [
