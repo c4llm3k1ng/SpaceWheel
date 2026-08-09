@@ -871,22 +871,30 @@ function update() {
                     targetBalls.push(getTargetCoordinates(obs.color, pX, pY, cX, cY, yX, yY, bX, bY));
                 }
 
-                let anyBallReached = false;
-                for (let ball of targetBalls) {
+                // Zustand pro Ziel-Kugel merken: Game Over erst, wenn ALLE ihre
+                // Chance hatten und keine durchgekommen ist (wichtig bei Zebra/Rainbow,
+                // deren Kugeln den Balken zu unterschiedlichen Zeitpunkten erreichen)
+                if (!obs._mChecked) { obs._mChecked = []; obs._mPassed = []; }
+                for (let bi = 0; bi < targetBalls.length; bi++) {
+                    let ball = targetBalls[bi];
                     // Nur prüfen wenn der Balken die tatsächliche Y-Position dieser Kugel erreicht hat
                     let barAtBallY = (obs.y + obs.height >= ball.y - sphereRadius && obs.y <= ball.y + sphereRadius);
                     if (!barAtBallY) continue;
-                    anyBallReached = true;
+                    obs._mChecked[bi] = true;
                     let _wb = wideGapTimer > 0 ? 30 : 0;
                     let inGap = (ball.x - sphereRadius + 1 >= obs.gapX - _wb && ball.x + sphereRadius - 1 <= obs.gapX + obs.gapWidth + _wb);
                     if (inGap) {
+                        obs._mPassed[bi] = true;
                         success = true;
                         closestDist = Math.min(closestDist, getDistanceToGapEdges(ball.x, obs.gapX - _wb, obs.gapWidth + _wb * 2));
                     }
                 }
 
-                // Schild-Logik: nur auslösen wenn der Balken wirklich bei der Kugel angekommen ist
-                if (!success && anyBallReached && starPowerTimer <= 0) {
+                let allBallsChecked = targetBalls.length > 0 && targetBalls.every((_, bi) => obs._mChecked[bi]);
+                let anyBallPassed = obs._mPassed.some(Boolean);
+
+                // Schild-Logik: erst auslösen wenn alle Ziel-Kugeln geprüft wurden und keine durchkam
+                if (!success && !anyBallPassed && allBallsChecked && starPowerTimer <= 0) {
                     if (hasShield) {
                         hasShield = false;
                         obs.passed = true;
