@@ -327,7 +327,7 @@
             </div>
             <div class="help-item">
                 <div class="help-icon">⬛⬛</div>
-                <div><div class="help-name">Dual</div><div class="help-desc">Zwei Balken mit je einer Lücke. Mindestens eine Kugel muss durchkommen.</div></div>
+                <div><div class="help-name">Dual</div><div class="help-desc">Zwei Balken mit je einer Lücke. Beide passenden Kugeln müssen durch ihre jeweilige Lücke.</div></div>
             </div>
             <div class="help-item">
                 <div class="help-icon">⬛⬛⬛</div>
@@ -389,7 +389,7 @@
     </div>
 
     <div id="ui-layer">
-        Score: <span id="score">0</span> | Highscore: <span id="highscore">0</span>
+        <span id="score-line">Score: <span id="score">0</span> | Highscore: <span id="highscore">0</span></span>
         <div id="level-banner">Stufe 1: Tutorial (Roter Fokus) 🔴</div>
     </div>
     <canvas id="gameCanvas" width="450" height="800"></canvas>
@@ -792,14 +792,15 @@ function update() {
                 if (bar1AtY) { obs._dual1Checked = true; if (ball1InGap) obs._dual1Passed = true; }
                 if (bar2AtY) { obs._dual2Checked = true; if (ball2InGap) obs._dual2Passed = true; }
 
-                let dualAnySuccess = obs._dual1Passed || obs._dual2Passed;
-                let dualAllFail = (obs._dual1Checked && !obs._dual1Passed) && (obs._dual2Checked && !obs._dual2Passed);
+                // BEIDE Kugeln müssen durch ihre jeweilige Lücke — eine allein reicht nicht
+                let dualSuccess = obs._dual1Passed && obs._dual2Passed;
+                let dualFail = (obs._dual1Checked && !obs._dual1Passed) || (obs._dual2Checked && !obs._dual2Passed);
 
-                if (dualAnySuccess) {
+                if (dualSuccess) {
                     success = true;
-                    if (bar1AtY && ball1InGap) closestDist = Math.min(closestDist, getDistanceToGapEdges(coord1.x, obs.gapX, obs.gapWidth));
-                    if (bar2AtY && ball2InGap) closestDist = Math.min(closestDist, getDistanceToGapEdges(coord2.x, obs.gapX2, obs.gapWidth2));
-                } else if (dualAllFail) {
+                    closestDist = Math.min(closestDist, getDistanceToGapEdges(coord1.x, obs.gapX, obs.gapWidth));
+                    closestDist = Math.min(closestDist, getDistanceToGapEdges(coord2.x, obs.gapX2, obs.gapWidth2));
+                } else if (dualFail) {
                     if (hasShield) {
                         hasShield = false;
                         obs.passed = true;
@@ -1533,17 +1534,17 @@ function closeHelp() {
 const TUTORIAL_SLIDES = [
     { icon: '🎮', title: 'Das Rad steuern', text: 'Wische links oder rechts über den Bildschirm, um das Rad zu drehen.\nAm Desktop: Pfeiltasten ← und →',
       test: { score: 0, noSpawn: true } },
-    { icon: '⬛', title: 'Die Balken', text: 'Balken fallen von oben. Positioniere das Rad so, dass deine Kugel durch die Lücke passt – sonst ist das Spiel vorbei!',
-      test: { score: 0, force: 'SINGLE' } },
+    { icon: '⬛', title: 'Die Balken', text: 'Balken fallen von oben. Positioniere das Rad so, dass deine Kugel durch die Lücke passt – sonst ist das Spiel vorbei! Jede durchquerte Lücke gibt +1 Punkt (siehe Anzeige oben).',
+      test: { score: 0, force: 'SINGLE', showScore: true } },
     { icon: '🎯', title: 'Risky Bonus', text: 'Wenn du sehr nah am Rand einer Lücke bleibst, gibt es +2 statt +1 Punkt.\n3 Riskys hintereinander = Triple Risky (+2 Bonus)!\n10 in Folge = Magical Risky (+10 Bonus)!',
-      test: { score: 0, force: 'SINGLE' } },
+      test: { score: 0, force: 'SINGLE', showScore: true } },
     { icon: '🔵', title: 'Zwei Farben', text: 'Ab Score 12 kommt die Cyan-Kugel dazu. Jeder Balken hat eine Farbe – die Kugel mit der passenden Farbe muss durch die Lücke.',
       test: { score: 12, force: 'SINGLE' } },
     { icon: '🌟', title: 'Drei Farben', text: 'Ab Score 51 kommt Gelb dazu. Behalte alle Kugeln im Blick und drehe die richtige Kugel zur Lücke!',
       test: { score: 51, force: 'SINGLE' } },
     { icon: '🟣', title: 'Vier Farben', text: 'Ab Score 125 vervollständigt Lila das Rad. Jetzt zählt jede Vierteldrehung!',
       test: { score: 125, force: 'SINGLE' } },
-    { icon: '👥', title: 'Doppel-Balken', text: 'Zwei Balken mit zwei Lücken gleichzeitig. Es reicht, wenn eine passende Kugel durch ihre Lücke kommt.',
+    { icon: '👥', title: 'Doppel-Balken', text: 'Zwei Balken mit zwei Lücken gleichzeitig – links und rechts. BEIDE Kugeln müssen durch ihre jeweilige Lücke!',
       test: { score: 12, force: 'DUAL' } },
     { icon: '🦓', title: 'Zebra-Balken', text: 'Gestreifte Balken gelten für mehrere Farben gleichzeitig. Auch hier reicht es, wenn eine der passenden Kugeln die Lücke trifft.',
       test: { score: 27, force: 'ZEBRA' } },
@@ -1559,6 +1560,7 @@ let tutorialStep = 0;
 function startTutorial() {
     tutorialStep = 0;
     gamePaused = true;
+    document.getElementById('score-line').style.display = 'none';
     document.getElementById('tutorial-overlay').style.display = 'block';
     document.getElementById('hamburger-btn').style.display = 'none';
     renderTutorialSlide();
@@ -1566,6 +1568,7 @@ function startTutorial() {
 function closeTutorial() {
     tutorialRestoreState();
     gamePaused = false;
+    document.getElementById('score-line').style.display = '';
     document.getElementById('tutorial-overlay').style.display = 'none';
     document.getElementById('tut-resume-btn').style.display = 'none';
     const anyOverlay = ['auth-screen','leaderboard-screen','add-friend-screen','help-screen']
@@ -1610,6 +1613,7 @@ function tutorialTry() {
     tutorialItemBoost = !!cfg.itemBoost;
     tutorialForceType = cfg.force || null;
     scoreEl.innerText = score;
+    document.getElementById('score-line').style.display = cfg.showScore ? '' : 'none';
     spawnTimer = tutorialNoSpawn ? 0 : 9999;
 
     gamePaused = false;
@@ -1645,6 +1649,7 @@ function tutorialRestoreState() {
 function tutorialResume() {
     tutorialRestoreState();
     gamePaused = true;
+    document.getElementById('score-line').style.display = 'none';
     document.getElementById('tut-resume-btn').style.display = 'none';
     document.getElementById('tutorial-overlay').style.display = 'block';
     renderTutorialSlide();
