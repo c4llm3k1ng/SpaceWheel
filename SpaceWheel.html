@@ -106,13 +106,62 @@
         .friend-code-box { background: #1e1f2e; border-radius: 8px; padding: 10px 16px; text-align: center; margin-top: 10px; font-size: 12px; color: #666; width: 100%; max-width: 420px; box-sizing: border-box; }
         .friend-code-box span { display: block; font-size: 22px; font-weight: bold; color: #00f2fe; letter-spacing: 4px; margin-top: 4px; }
 
-        #lb-game-btn {
-            position: fixed; top: 10px; right: 16px;
+        #hamburger-btn {
+            position: fixed; top: 10px; left: 12px;
             background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1);
-            color: #fff; width: 38px; height: 38px; border-radius: 50%;
-            font-size: 16px; cursor: pointer; z-index: 10;
+            color: #fff; width: 38px; height: 38px; border-radius: 10px;
+            font-size: 20px; cursor: pointer; z-index: 200;
             display: none; align-items: center; justify-content: center; touch-action: auto;
         }
+        #hamburger-menu {
+            display: none; position: fixed; inset: 0; z-index: 300;
+            background: rgba(10,10,15,0.97); flex-direction: column;
+            align-items: center; justify-content: center;
+        }
+        #hamburger-menu.active { display: flex; }
+        .ham-card { width: 100%; max-width: 320px; padding: 16px; }
+        .ham-title { font-size: 26px; font-weight: bold; color: #ff007f; text-align: center; margin-bottom: 24px; }
+        .ham-item {
+            display: flex; align-items: center; gap: 14px; width: 100%;
+            padding: 16px 20px; margin-bottom: 10px; background: #13141a;
+            border: 1px solid #2a2b3d; border-radius: 14px;
+            color: #e0e0e0; font-size: 17px; cursor: pointer; text-align: left;
+        }
+        .ham-item:active { background: #1e1f2e; }
+        .ham-item.disabled { opacity: 0.35; cursor: default; pointer-events: none; }
+        .ham-icon { font-size: 22px; width: 28px; text-align: center; flex-shrink: 0; }
+
+        #tutorial-overlay {
+            display: none; position: fixed; left: 0; right: 0; bottom: 0; z-index: 250;
+            background: linear-gradient(to bottom, transparent 0, rgba(10,10,15,0.7) 25%, rgba(10,10,15,0.97) 45%);
+            padding-top: 80px;
+        }
+        .tut-card { margin: 0 12px 16px; background: #13141a; border: 1px solid #2a2b3d; border-radius: 18px; padding: 22px 20px 16px; }
+        .tut-dots { display: flex; justify-content: center; gap: 6px; margin-bottom: 14px; }
+        .tut-dot { width: 7px; height: 7px; border-radius: 50%; background: #2a2b3d; transition: background 0.2s; }
+        .tut-dot.active { background: #ff007f; }
+        .tut-icon { font-size: 32px; margin-bottom: 8px; }
+        .tut-title { font-size: 17px; font-weight: bold; color: #fff; margin-bottom: 6px; }
+        .tut-text { font-size: 13px; color: #999; line-height: 1.6; margin-bottom: 14px; white-space: pre-line; }
+        .tut-nav { display: flex; justify-content: space-between; align-items: center; }
+        .tut-skip { background: none; border: none; color: #444; font-size: 13px; cursor: pointer; padding: 8px 0; }
+        .tut-next { background: #ff007f; border: none; border-radius: 10px; color: #fff; font-size: 15px; font-weight: bold; padding: 10px 28px; cursor: pointer; }
+
+        #help-screen {
+            display: none; position: fixed; inset: 0; z-index: 300;
+            background: #0a0a0f; flex-direction: column; align-items: center;
+            overflow-y: auto; padding: 20px 16px 40px;
+        }
+        #help-screen.active { display: flex; }
+        .help-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; width: 100%; max-width: 420px; }
+        .help-back { background: #1e1f2e; border: none; color: #fff; width: 38px; height: 38px; border-radius: 50%; font-size: 20px; cursor: pointer; flex-shrink: 0; }
+        .help-title-text { font-size: 20px; font-weight: bold; }
+        .help-section { width: 100%; max-width: 420px; margin-bottom: 20px; }
+        .help-sec-title { font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; padding-left: 4px; }
+        .help-item { background: #13141a; border-radius: 12px; padding: 14px 16px; margin-bottom: 8px; display: flex; gap: 12px; align-items: flex-start; }
+        .help-icon { font-size: 22px; width: 30px; text-align: center; flex-shrink: 0; padding-top: 2px; }
+        .help-name { font-size: 14px; font-weight: bold; color: #e0e0e0; margin-bottom: 3px; }
+        .help-desc { font-size: 13px; color: #777; line-height: 1.5; }
         .add-friend-card { background: #13141a; border-radius: 16px; padding: 28px 24px; width: 100%; max-width: 360px; }
         .add-friend-title { font-size: 18px; font-weight: bold; margin-bottom: 16px; }
         .add-friend-input {
@@ -127,7 +176,7 @@
 </head>
 <body>
 
-    <button id="lb-game-btn" onclick="openLeaderboard()">🏆</button>
+    <button id="hamburger-btn" onclick="openHamburger()">☰</button>
 
     <!-- Auth Screen -->
     <div id="auth-screen" class="overlay-screen active">
@@ -176,6 +225,146 @@
             <button class="auth-btn" onclick="handleAddFriend()">Anfrage senden</button>
             <div class="auth-error" id="add-friend-error"></div>
             <button class="auth-guest-btn" onclick="closeAddFriend()">Abbrechen</button>
+        </div>
+    </div>
+
+    <!-- Hamburger Menu -->
+    <div id="hamburger-menu">
+        <div class="ham-card">
+            <div class="ham-title">Space Wheel</div>
+            <button class="ham-item" onclick="closeHamburger()">
+                <span class="ham-icon">▶</span> Spielen
+            </button>
+            <button class="ham-item" onclick="closeHamburger(); openLeaderboard()">
+                <span class="ham-icon">🏆</span> Bestenliste
+            </button>
+            <button class="ham-item" onclick="closeHamburger(); startTutorial()">
+                <span class="ham-icon">📖</span> Tutorial
+            </button>
+            <button class="ham-item" onclick="closeHamburger(); openHelp()">
+                <span class="ham-icon">❓</span> Hilfe
+            </button>
+            <button class="ham-item disabled">
+                <span class="ham-icon">⚙️</span> Einstellungen
+            </button>
+        </div>
+    </div>
+
+    <!-- Tutorial Overlay -->
+    <div id="tutorial-overlay">
+        <div class="tut-card">
+            <div class="tut-dots" id="tut-dots"></div>
+            <div class="tut-icon" id="tut-icon"></div>
+            <div class="tut-title" id="tut-title"></div>
+            <div class="tut-text" id="tut-text"></div>
+            <div class="tut-nav">
+                <button class="tut-skip" onclick="closeTutorial()">Überspringen</button>
+                <button class="tut-next" id="tut-next-btn" onclick="tutorialNext()">Weiter →</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Screen -->
+    <div id="help-screen">
+        <div class="help-header">
+            <button class="help-back" onclick="closeHelp()">←</button>
+            <div class="help-title-text">❓ Hilfe</div>
+        </div>
+
+        <div class="help-section">
+            <div class="help-sec-title">Steuerung</div>
+            <div class="help-item">
+                <div class="help-icon">👆</div>
+                <div><div class="help-name">Wischen</div><div class="help-desc">Wische links oder rechts über den Bildschirm, um das Rad zu drehen.</div></div>
+            </div>
+            <div class="help-item">
+                <div class="help-icon">⌨️</div>
+                <div><div class="help-name">Tastatur</div><div class="help-desc">Pfeiltasten ← → zum Drehen (am Desktop).</div></div>
+            </div>
+        </div>
+
+        <div class="help-section">
+            <div class="help-sec-title">Kugeln</div>
+            <div class="help-item">
+                <div class="help-icon" style="color:#ff007f;">●</div>
+                <div><div class="help-name">Pink – immer aktiv</div><div class="help-desc">Deine erste Kugel, von Anfang an dabei.</div></div>
+            </div>
+            <div class="help-item">
+                <div class="help-icon" style="color:#00f2fe;">●</div>
+                <div><div class="help-name">Cyan – ab Score 12</div><div class="help-desc">Zweite Kugel, gegenüberliegend von Pink.</div></div>
+            </div>
+            <div class="help-item">
+                <div class="help-icon" style="color:#ffe600;">●</div>
+                <div><div class="help-name">Gelb – ab Score 51</div><div class="help-desc">Dritte Kugel, erscheint zwischen Pink und Cyan.</div></div>
+            </div>
+            <div class="help-item">
+                <div class="help-icon" style="color:#cc44ff;">●</div>
+                <div><div class="help-name">Lila – ab Score 125</div><div class="help-desc">Vierte Kugel, schließt das Rad.</div></div>
+            </div>
+        </div>
+
+        <div class="help-section">
+            <div class="help-sec-title">Hindernisse</div>
+            <div class="help-item">
+                <div class="help-icon">⬛</div>
+                <div><div class="help-name">Normal</div><div class="help-desc">Ein Balken mit einer Lücke. Drehe das Rad so, dass deine Kugel durchpasst.</div></div>
+            </div>
+            <div class="help-item">
+                <div class="help-icon">⬛⬛</div>
+                <div><div class="help-name">Dual</div><div class="help-desc">Zwei Balken mit je einer Lücke. Mindestens eine Kugel muss durchkommen.</div></div>
+            </div>
+            <div class="help-item">
+                <div class="help-icon">⬛⬛⬛</div>
+                <div><div class="help-name">Triple</div><div class="help-desc">Drei Balken gleichzeitig – noch enger, aber gleiches Prinzip.</div></div>
+            </div>
+            <div class="help-item">
+                <div class="help-icon">💣</div>
+                <div><div class="help-name">Bombe</div><div class="help-desc">Kein Balken, aber eine Bombe. Berühre sie nicht! Mit einem Schild überstehst du den Treffer.</div></div>
+            </div>
+        </div>
+
+        <div class="help-section">
+            <div class="help-sec-title">Items</div>
+            <div class="help-item">
+                <div class="help-icon">🌟</div>
+                <div><div class="help-name">Star Immunity (6,3 s)</div><div class="help-desc">Kolissionen werden ignoriert – Kugeln passieren alle Balken.</div></div>
+            </div>
+            <div class="help-item">
+                <div class="help-icon">⏳</div>
+                <div><div class="help-name">Zeitlupe (5,3 s)</div><div class="help-desc">Alle Balken fallen langsamer – mehr Zeit zum Reagieren.</div></div>
+            </div>
+            <div class="help-item">
+                <div class="help-icon">🛡️</div>
+                <div><div class="help-name">Schild</div><div class="help-desc">Hält einen Treffer auf – wird erst bei einer echten Kollision verbraucht.</div></div>
+            </div>
+            <div class="help-item">
+                <div class="help-icon">💥</div>
+                <div><div class="help-name">Sprengung (5,3 s)</div><div class="help-desc">Alle aktuellen Balken auf dem Bildschirm werden entfernt.</div></div>
+            </div>
+            <div class="help-item">
+                <div class="help-icon">↔</div>
+                <div><div class="help-name">Breite Lücken (5,3 s)</div><div class="help-desc">Die Lücken aller Balken werden deutlich breiter.</div></div>
+            </div>
+        </div>
+
+        <div class="help-section">
+            <div class="help-sec-title">Punkte</div>
+            <div class="help-item">
+                <div class="help-icon">✅</div>
+                <div><div class="help-name">Normal – +1 Punkt</div><div class="help-desc">Kugel passiert die Lücke ohne Risiko.</div></div>
+            </div>
+            <div class="help-item">
+                <div class="help-icon">🎯</div>
+                <div><div class="help-name">Risky – +2 Punkte</div><div class="help-desc">Kugel schrammt am Rand der Lücke entlang (Abstand ≤ 5 px). Immer +2.</div></div>
+            </div>
+            <div class="help-item">
+                <div class="help-icon">🔥</div>
+                <div><div class="help-name">Triple Risky – +2 Bonus</div><div class="help-desc">3 Riskys hintereinander: einmaliger Bonustrefferpunkt.</div></div>
+            </div>
+            <div class="help-item">
+                <div class="help-icon">✨</div>
+                <div><div class="help-name">Magical Risky – +10 Bonus</div><div class="help-desc">10 Riskys hintereinander: großer Bonustreffer!</div></div>
+            </div>
         </div>
     </div>
 
@@ -698,22 +887,19 @@ function awardPoints(closestDist, color) {
 
     if (closestDist <= 5 && wideGapTimer <= 0) {
         perfectStreak++;
-        let bonus = 1; // Standard Perfect-Bonus (Streak 1–2)
+        earnedPoints = 2; // Risky gibt immer +2
 
         if (perfectStreak === 3) {
-            bonus = 3; // +1 Perfect + +2 Triple-Trigger
-            createFloatingText("🔥 Triple Perfect! +2 Bonus!", orbitX, orbitY - 80);
-        } else if (perfectStreak > 3 && perfectStreak < 10) {
-            bonus = 2; // Triple-Zone
+            score += 2; // Serienbonus Triple Risky
+            scoreEl.innerText = score;
+            createFloatingText("🔥 Triple Risky! +2 Bonus!", orbitX, orbitY - 80);
         } else if (perfectStreak === 10) {
-            bonus = 12; // +2 Triple-Zone + +10 Magical-Trigger
-            createFloatingText("✨ MAGICAL PERFECT! +10 Bonus!", orbitX, orbitY - 80);
-        } else if (perfectStreak > 10) {
-            bonus = 3; // Magical-Zone
+            score += 10; // Serienbonus Magical Risky
+            scoreEl.innerText = score;
+            createFloatingText("✨ MAGICAL RISKY! +10 Bonus!", orbitX, orbitY - 80);
         }
 
-        earnedPoints += bonus;
-        createFloatingText(`+${earnedPoints} Perfect! 🎯`, orbitX, orbitY - 50);
+        createFloatingText("+2 Risky! 🎯", orbitX, orbitY - 50);
         triggerJuiceEffect(color);
     } else if (wideGapTimer <= 0) {
         perfectStreak = 0;
@@ -1222,10 +1408,79 @@ let authMode = 'login';
 let isGuest = false;
 
 function showScreen(id) {
-    ['auth-screen','leaderboard-screen','add-friend-screen']
+    ['auth-screen','leaderboard-screen','add-friend-screen','help-screen']
         .forEach(s => document.getElementById(s).classList.remove('active'));
+    document.getElementById('hamburger-menu').classList.remove('active');
+    closeTutorial();
     if (id) document.getElementById(id).classList.add('active');
-    document.getElementById('lb-game-btn').style.display = id ? 'none' : 'flex';
+    document.getElementById('hamburger-btn').style.display = id ? 'none' : 'flex';
+}
+
+// ── Hamburger Menu ──────────────────────────────────────────
+function openHamburger() {
+    document.getElementById('hamburger-menu').classList.add('active');
+    document.getElementById('hamburger-btn').style.display = 'none';
+    closeTutorial();
+}
+function closeHamburger() {
+    document.getElementById('hamburger-menu').classList.remove('active');
+    document.getElementById('hamburger-btn').style.display = 'flex';
+}
+
+// ── Help Screen ─────────────────────────────────────────────
+function openHelp() {
+    document.getElementById('help-screen').classList.add('active');
+    document.getElementById('hamburger-btn').style.display = 'none';
+}
+function closeHelp() {
+    document.getElementById('help-screen').classList.remove('active');
+    document.getElementById('hamburger-btn').style.display = 'flex';
+}
+
+// ── Tutorial ────────────────────────────────────────────────
+const TUTORIAL_SLIDES = [
+    { icon: '🎮', title: 'Das Rad steuern', text: 'Wische links oder rechts über den Bildschirm, um das Rad zu drehen.\nAm Desktop: Pfeiltasten ← und →' },
+    { icon: '🔴', title: 'Deine Kugeln', text: 'Pink ist von Anfang an dabei. Cyan kommt bei Score 12, Gelb bei 51 und Lila bei 125 dazu.' },
+    { icon: '⬛', title: 'Die Balken', text: 'Balken fallen von oben. Positioniere das Rad so, dass deine Kugeln durch die Lücken passen – sonst ist das Spiel vorbei!' },
+    { icon: '🎯', title: 'Risky Bonus', text: 'Wenn du sehr nah am Rand einer Lücke bleibst, gibt es +2 statt +1 Punkt.\n3 Riskys hintereinander = Triple Risky (+2 Bonus)!\n10 in Folge = Magical Risky (+10 Bonus)!' },
+    { icon: '✨', title: 'Items', text: '🌟 Star Immunity · ⏳ Zeitlupe\n🛡️ Schild · 💥 Sprengung · ↔ Breite Lücken\n\nFliege durch sie hindurch um sie zu aktivieren.' },
+    { icon: '🚀', title: 'Los geht\'s!', text: 'Erreiche hohe Scores und schlage deine Freunde in der Bestenliste.\n\nViel Erfolg!' }
+];
+let tutorialStep = 0;
+
+function startTutorial() {
+    tutorialStep = 0;
+    document.getElementById('tutorial-overlay').style.display = 'block';
+    document.getElementById('hamburger-btn').style.display = 'none';
+    renderTutorialSlide();
+}
+function closeTutorial() {
+    document.getElementById('tutorial-overlay').style.display = 'none';
+    const anyOverlay = ['auth-screen','leaderboard-screen','add-friend-screen','help-screen']
+        .some(s => document.getElementById(s).classList.contains('active'));
+    if (!anyOverlay && !document.getElementById('hamburger-menu').classList.contains('active')) {
+        document.getElementById('hamburger-btn').style.display = 'flex';
+    }
+}
+function tutorialNext() {
+    if (tutorialStep < TUTORIAL_SLIDES.length - 1) {
+        tutorialStep++;
+        renderTutorialSlide();
+    } else {
+        closeTutorial();
+    }
+}
+function renderTutorialSlide() {
+    const slide = TUTORIAL_SLIDES[tutorialStep];
+    document.getElementById('tut-icon').textContent = slide.icon;
+    document.getElementById('tut-title').textContent = slide.title;
+    document.getElementById('tut-text').textContent = slide.text;
+    const isLast = tutorialStep === TUTORIAL_SLIDES.length - 1;
+    document.getElementById('tut-next-btn').textContent = isLast ? 'Fertig ✓' : 'Weiter →';
+    const dots = document.getElementById('tut-dots');
+    dots.innerHTML = TUTORIAL_SLIDES.map((_, i) =>
+        `<div class="tut-dot${i === tutorialStep ? ' active' : ''}"></div>`
+    ).join('');
 }
 
 function switchAuthTab(mode) {
