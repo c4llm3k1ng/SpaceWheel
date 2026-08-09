@@ -1613,12 +1613,18 @@ let musicTimer = null, eighthCount = 0, nextEighthTime = 0;
 const MUSIC_BPM = 144;
 const STEP16 = 60 / MUSIC_BPM / 4;
 const EIGHTH = STEP16 * 2;
-// 4 Akkorde à 2 Takte — A-Moll: Am – F – C – G
+// 4 Akkorde à 2 Takte — dunkle absteigende Kadenz: Am – G – F – E
+// melody: 16tel-Step → [MIDI-Note, Länge in Steps]; gleiches Riff-Muster
+// pro Akkord transponiert = Wiedererkennung (Ohrwurm-Hook)
 const MUSIC_CHORDS = [
-    { bass: 45, arpRoot: 57, minor: true },
-    { bass: 41, arpRoot: 53, minor: false },
-    { bass: 48, arpRoot: 60, minor: false },
-    { bass: 43, arpRoot: 55, minor: false }
+    { bass: 45, arpRoot: 57, minor: true,
+      melody: { 0:[76,3], 4:[76,2], 6:[81,4], 12:[79,3], 16:[76,2], 20:[74,2], 24:[72,3], 28:[74,3] } },
+    { bass: 43, arpRoot: 55, minor: false,
+      melody: { 0:[74,3], 4:[74,2], 6:[79,4], 12:[71,3], 16:[74,2], 20:[72,2], 24:[71,3], 28:[72,3] } },
+    { bass: 41, arpRoot: 53, minor: false,
+      melody: { 0:[72,3], 4:[72,2], 6:[77,4], 12:[81,3], 16:[79,2], 20:[77,2], 24:[76,3], 28:[74,3] } },
+    { bass: 40, arpRoot: 52, minor: false,
+      melody: { 0:[71,3], 4:[71,2], 6:[76,4], 12:[80,3], 16:[76,2], 20:[74,2], 24:[72,3], 28:[68,3] } }
 ];
 const ARP_SEQ = [0, 2, 3, 2, 1, 2, 3, 2, 0, 2, 3, 2, 1, 3, 2, 3];
 
@@ -1695,11 +1701,30 @@ function playStep(step, t) {
     if (si % 4 === 2) { bassVoice(midiFreq(chord.bass), t); openHatVoice(t); }
     if (si % 16 === 4 || si % 16 === 12) snareVoice(t);
     else if (si % 2 === 1) hatVoice(t);
-    // Rollendes 16tel-Arpeggio, Oktave hoch im 2. Takt, Filterfahrt über den Loop
+    // Rollendes 16tel-Arpeggio (leise Textur), Oktave hoch im 2. Takt, Filterfahrt
     const iv2 = chord.minor ? [0, 3, 7, 12] : [0, 4, 7, 12];
     const note = chord.arpRoot + iv2[ARP_SEQ[si % 16]] + (si >= 16 ? 12 : 0);
     const cutoff = 500 + 2400 * (0.5 - 0.5 * Math.cos(2 * Math.PI * loopPhase));
-    arpVoice(midiFreq(note), t, si % 4 === 0 ? 0.055 : 0.038, cutoff);
+    arpVoice(midiFreq(note), t, si % 4 === 0 ? 0.04 : 0.028, cutoff);
+    // Lead-Melodie: das Riff, das hängen bleiben soll
+    const mel = chord.melody[si];
+    if (mel) leadVoice(midiFreq(mel[0]), t, mel[1] * STEP16);
+}
+
+function leadVoice(freq, t, dur) {
+    [-8, 8].forEach(det => {
+        const o = audioCtx.createOscillator();
+        o.type = 'sawtooth'; o.frequency.value = freq; o.detune.value = det;
+        const f = audioCtx.createBiquadFilter();
+        f.type = 'lowpass'; f.frequency.value = 2200; f.Q.value = 1.5;
+        const g = audioCtx.createGain();
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(0.055, t + 0.02);
+        g.gain.setValueAtTime(0.055, t + dur);
+        g.gain.exponentialRampToValueAtTime(0.001, t + dur + 0.1);
+        o.connect(f); f.connect(g); g.connect(musicMaster); g.connect(musicDelay);
+        o.start(t); o.stop(t + dur + 0.15);
+    });
 }
 
 function padVoice(freq, t, dur) {
