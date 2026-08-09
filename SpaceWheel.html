@@ -783,7 +783,7 @@ function update() {
                                 alpha: 1, size: Math.random() * 6 + 2
                             });
                         }
-                        triggerGameOver();
+                        triggerGameOver('bomb');
                         return;
                     }
                 }
@@ -1197,8 +1197,8 @@ function triggerJuiceEffect(color) {
     }
 }
 
-function triggerGameOver() {
-    playSfx('crash');
+function triggerGameOver(cause) {
+    playSfx(cause === 'bomb' ? 'bomb' : 'crash');
     if (tutorialTestActive) {
         // Im Tutorial-Test kein echtes Game Over: Feld leeren und weiterprobieren
         obstacles = []; items = [];
@@ -1785,9 +1785,14 @@ function playSfx(kind) {
         sfxNoise(t, 0.3, 'lowpass', 900, 0.5, 0.4);
         sfxThump(t, 120, 40, 0.25, 0.3);
     } else if (kind === 'crash') {
-        // Aufprall an Balken oder Bombe
+        // Aufprall an einem Balken: dumpfer Crash
         sfxNoise(t, 0.5, 'lowpass', 700, 0.5, 0.55);
         sfxThump(t, 160, 30, 0.45, 0.5);
+    } else if (kind === 'bomb') {
+        // Bombenexplosion: heller Knall mit langem Grollen
+        sfxNoise(t, 0.12, 'highpass', 2500, 0.7, 0.35);
+        sfxNoise(t, 0.7, 'lowpass', 1400, 0.5, 0.6);
+        sfxThump(t, 200, 25, 0.6, 0.55);
     } else if (kind === 'shield') {
         // Schild fängt Treffer ab: metallischer Ping
         const o = audioCtx.createOscillator();
