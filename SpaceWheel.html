@@ -355,7 +355,7 @@
             </div>
             <div class="help-item">
                 <div class="help-icon">🛡️</div>
-                <div><div class="help-name">Schild</div><div class="help-desc">Hält einen Treffer auf – wird erst bei einer echten Kollision verbraucht.</div></div>
+                <div><div class="help-name">Schild (10,2 s)</div><div class="help-desc">Hält einen Treffer auf. Wird bei einer Kollision verbraucht oder läuft nach 10,2 Sekunden ab.</div></div>
             </div>
             <div class="help-item">
                 <div class="help-icon">💥</div>
@@ -436,6 +436,7 @@ let lastPattern = -1;
 // Buff / Item Zustände
 let slowMotionTimer = 0;
 let hasShield = false;
+let shieldTimer = 0;
 let clearTimer = 0;
 let starPowerTimer = 0; 
 let itemCooldownBalken = 0;
@@ -526,9 +527,10 @@ function resetGame() {
     gameOver = false;
     orbitAngle = 0; 
     targetOrbitAngle = 0;
-    spawnTimer = 9999; 
+    spawnTimer = 9999;
     slowMotionTimer = 0;
     hasShield = false;
+    shieldTimer = 0;
     clearTimer = 0;
     starPowerTimer = 0;
     itemCooldownBalken = 0;
@@ -581,6 +583,15 @@ function update() {
     if (slowMotionTimer > 0) slowMotionTimer = Math.max(0, slowMotionTimer - dt);
     if (clearTimer > 0) clearTimer = Math.max(0, clearTimer - dt);
     if (wideGapTimer > 0) wideGapTimer = Math.max(0, wideGapTimer - dt);
+    if (hasShield) {
+        shieldTimer = Math.max(0, shieldTimer - dt);
+        if (shieldTimer === 0) {
+            hasShield = false;
+            createFloatingText("🛡️ Schild abgelaufen", orbitX, orbitY - 50);
+        }
+    } else {
+        shieldTimer = 0;
+    }
     if (prevStarPower > 0 && starPowerTimer === 0) {
         currentRequiredInterval = FIXED_INTERVAL + 1200;
         spawnTimer = 0;
@@ -887,6 +898,7 @@ function activateItem(effect) {
         createFloatingText("Zeitlupe! ⏳", orbitX, orbitY - 50);
     } else if (effect === ITEM_SHIELD) {
         hasShield = true;
+        shieldTimer = 10.2;
         createFloatingText("Schild aktiv! 🛡️", orbitX, orbitY - 50);
     } else if (effect === ITEM_WIDEGAP) {
         wideGapTimer = 5.2;
@@ -1395,6 +1407,7 @@ function draw() {
         { t: slowMotionTimer, max: 5.2, color: '#00f2fe', icon: '⏳' },
         { t: clearTimer,      max: 5.2, color: '#ff3300', icon: '💥' },
         { t: wideGapTimer,    max: 5.2, color: '#aa00ff', icon: '↔'  },
+        { t: shieldTimer,     max: 10.2, color: '#ffffff', icon: '🛡️' },
     ].filter(x => x.t > 0);
     activeTimers.forEach((item, i) => {
         const tx = canvas.width - 26, ty = 32 + i * 38, tr = 14;
@@ -1604,14 +1617,14 @@ function tutorialTry() {
     // Echten Spielstand sichern, dann Sandbox für den aktuellen Schritt aufbauen
     tutSavedState = {
         score, obstacles, items, particles, gameOver,
-        spawnTimer, currentRequiredInterval, slowMotionTimer, hasShield,
+        spawnTimer, currentRequiredInterval, slowMotionTimer, hasShield, shieldTimer,
         clearTimer, starPowerTimer, wideGapTimer, itemCooldownBalken,
         lastPattern, lastColorStr, colorStreakCount, perfectStreak
     };
     tutorialTestActive = true;
     obstacles = []; items = []; particles = [];
     gameOver = false;
-    slowMotionTimer = 0; hasShield = false; clearTimer = 0;
+    slowMotionTimer = 0; hasShield = false; shieldTimer = 0; clearTimer = 0;
     starPowerTimer = 0; wideGapTimer = 0; itemCooldownBalken = 0;
     lastPattern = -1; lastColorStr = ''; colorStreakCount = 0; perfectStreak = 0;
     currentRequiredInterval = FIXED_INTERVAL;
@@ -1641,6 +1654,7 @@ function tutorialRestoreState() {
     currentRequiredInterval = tutSavedState.currentRequiredInterval;
     slowMotionTimer = tutSavedState.slowMotionTimer;
     hasShield = tutSavedState.hasShield;
+    shieldTimer = tutSavedState.shieldTimer;
     clearTimer = tutSavedState.clearTimer;
     starPowerTimer = tutSavedState.starPowerTimer;
     wideGapTimer = tutSavedState.wideGapTimer;

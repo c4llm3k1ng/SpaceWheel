@@ -1,4 +1,4 @@
-const CACHE = 'orbit-sync-v13';
+const CACHE = 'orbit-sync-v14';
 const STATIC_ASSETS = [
     './manifest.json',
     './icon-192.png',
