@@ -965,7 +965,7 @@ function activateItem(effect) {
 }
 
 function awardPoints(closestDist, color) {
-    playSfx(closestDist <= 5 && wideGapTimer <= 0 ? 'risky' : 'pass');
+    if (closestDist <= 5 && wideGapTimer <= 0) playSfx('risky');
     let earnedPoints = 1; // Basis-Punkt für jeden geclearten Balken
 
     if (closestDist <= 5 && wideGapTimer <= 0) {
@@ -1610,17 +1610,17 @@ let sfxEnabled = localStorage.getItem('sw_sfx') !== 'off';
 let audioCtx = null, musicMaster = null, sfxMaster = null;
 let musicDelay = null, musicDelayGain = null, noiseBuf = null;
 let musicTimer = null, eighthCount = 0, nextEighthTime = 0;
-const MUSIC_BPM = 122;
-const EIGHTH = 60 / MUSIC_BPM / 2;
-// 4 Akkorde à 2 Takte: Am(add9) – Fmaj7 – Cmaj7 – G6
+const MUSIC_BPM = 144;
+const STEP16 = 60 / MUSIC_BPM / 4;
+const EIGHTH = STEP16 * 2;
+// 4 Akkorde à 2 Takte — A-Moll: Am – F – C – G
 const MUSIC_CHORDS = [
-    { bass: 45, pad: [57, 60, 64, 71], arp: [69, 72, 76, 79] },
-    { bass: 41, pad: [53, 57, 60, 64], arp: [65, 69, 72, 76] },
-    { bass: 48, pad: [55, 59, 60, 64], arp: [67, 72, 76, 79] },
-    { bass: 43, pad: [55, 59, 62, 64], arp: [67, 71, 74, 79] }
+    { bass: 45, arpRoot: 57, minor: true },
+    { bass: 41, arpRoot: 53, minor: false },
+    { bass: 48, arpRoot: 60, minor: false },
+    { bass: 43, arpRoot: 55, minor: false }
 ];
-const ARP_PATTERN = [0, 1, 2, 1, 3, 2, 1, 2, 0, 2, 3, 1, 2, 3, 2, 1];
-const BASS_OFFSETS = [0, 0, 0, 12, 0, 0, 12, 0];
+const ARP_SEQ = [0, 2, 3, 2, 1, 2, 3, 2, 0, 2, 3, 2, 1, 3, 2, 3];
 
 function midiFreq(m) { return 440 * Math.pow(2, (m - 69) / 12); }
 
@@ -1637,7 +1637,7 @@ function ensureAudioCtx() {
     musicDelay = audioCtx.createDelay(1.0);
     musicDelay.delayTime.value = EIGHTH * 1.5;
     musicDelayGain = audioCtx.createGain();
-    musicDelayGain.gain.value = 0.28;
+    musicDelayGain.gain.value = 0.35;
     musicDelay.connect(musicDelayGain);
     musicDelayGain.connect(musicDelay);
     musicDelayGain.connect(musicMaster);
@@ -1675,35 +1675,43 @@ function scheduleMusic() {
     const target = (gamePaused || gameOver) ? 0.07 : 0.22;
     musicMaster.gain.setTargetAtTime(target, audioCtx.currentTime, 0.4);
     while (nextEighthTime < audioCtx.currentTime + 0.25) {
-        playEighth(eighthCount, nextEighthTime);
-        eighthCount = (eighthCount + 1) % 64;
-        nextEighthTime += EIGHTH;
+        playStep(eighthCount, nextEighthTime);
+        eighthCount = (eighthCount + 1) % 128;
+        nextEighthTime += STEP16;
     }
 }
 
-function playEighth(step, t) {
-    const chord = MUSIC_CHORDS[Math.floor(step / 16) % 4];
-    const si = step % 16;
-    if (si === 0) chord.pad.forEach(n => padVoice(midiFreq(n), t, 16 * EIGHTH));
-    // Kick auf jedem Beat, Hihat dazwischen, Snare auf 2 und 4
-    if (si % 2 === 0) kickVoice(t);
-    else hatVoice(t);
-    if (si % 8 === 2 || si % 8 === 6) snareVoice(t);
-    // Treibender Achtel-Bass mit Oktavsprüngen
-    bassVoice(midiFreq(chord.bass + BASS_OFFSETS[si % 8]), t);
-    arpVoice(midiFreq(chord.arp[ARP_PATTERN[si]]), t, si % 2 === 0 ? 0.05 : 0.035);
+function playStep(step, t) {
+    const chord = MUSIC_CHORDS[Math.floor(step / 32) % 4];
+    const si = step % 32;
+    const loopPhase = step / 128;
+    // Dunkle Fläche bei jedem Akkordwechsel
+    if (si === 0) {
+        const iv = chord.minor ? [0, 3, 7] : [0, 4, 7];
+        iv.forEach(o => padVoice(midiFreq(chord.arpRoot + o), t, 32 * STEP16));
+    }
+    // Four-on-the-Floor-Kick, pumpender Offbeat-Bass, Snare auf 2 und 4
+    if (si % 4 === 0) kickVoice(t);
+    if (si % 4 === 2) { bassVoice(midiFreq(chord.bass), t); openHatVoice(t); }
+    if (si % 16 === 4 || si % 16 === 12) snareVoice(t);
+    else if (si % 2 === 1) hatVoice(t);
+    // Rollendes 16tel-Arpeggio, Oktave hoch im 2. Takt, Filterfahrt über den Loop
+    const iv2 = chord.minor ? [0, 3, 7, 12] : [0, 4, 7, 12];
+    const note = chord.arpRoot + iv2[ARP_SEQ[si % 16]] + (si >= 16 ? 12 : 0);
+    const cutoff = 500 + 2400 * (0.5 - 0.5 * Math.cos(2 * Math.PI * loopPhase));
+    arpVoice(midiFreq(note), t, si % 4 === 0 ? 0.055 : 0.038, cutoff);
 }
 
 function padVoice(freq, t, dur) {
-    [-6, 6].forEach(det => {
+    [-7, 7].forEach(det => {
         const o = audioCtx.createOscillator();
         o.type = 'sawtooth'; o.frequency.value = freq; o.detune.value = det;
         const f = audioCtx.createBiquadFilter();
-        f.type = 'lowpass'; f.frequency.value = 1100; f.Q.value = 0.5;
+        f.type = 'lowpass'; f.frequency.value = 700; f.Q.value = 0.5;
         const g = audioCtx.createGain();
         g.gain.setValueAtTime(0, t);
-        g.gain.linearRampToValueAtTime(0.035, t + 0.6);
-        g.gain.setValueAtTime(0.035, t + dur - 0.8);
+        g.gain.linearRampToValueAtTime(0.028, t + 0.4);
+        g.gain.setValueAtTime(0.028, t + dur - 0.5);
         g.gain.linearRampToValueAtTime(0, t + dur);
         o.connect(f); f.connect(g); g.connect(musicMaster);
         o.start(t); o.stop(t + dur + 0.1);
@@ -1711,27 +1719,42 @@ function padVoice(freq, t, dur) {
 }
 
 function bassVoice(freq, t) {
+    // Pumpender Offbeat-Stab
     const o = audioCtx.createOscillator();
     o.type = 'sawtooth'; o.frequency.value = freq;
     const f = audioCtx.createBiquadFilter();
-    f.type = 'lowpass'; f.frequency.value = 420; f.Q.value = 1.2;
+    f.type = 'lowpass'; f.frequency.value = 350; f.Q.value = 1.5;
     const g = audioCtx.createGain();
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.14, t + 0.015);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+    g.gain.linearRampToValueAtTime(0.24, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
     o.connect(f); f.connect(g); g.connect(musicMaster);
-    o.start(t); o.stop(t + 0.25);
+    o.start(t); o.stop(t + 0.2);
 }
 
-function arpVoice(freq, t, vel) {
+function arpVoice(freq, t, vel, cutoff) {
     const o = audioCtx.createOscillator();
-    o.type = 'triangle'; o.frequency.value = freq;
+    o.type = 'sawtooth'; o.frequency.value = freq;
+    const f = audioCtx.createBiquadFilter();
+    f.type = 'lowpass'; f.frequency.value = cutoff || 1200; f.Q.value = 3;
     const g = audioCtx.createGain();
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(vel, t + 0.012);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
-    o.connect(g); g.connect(musicMaster); g.connect(musicDelay);
-    o.start(t); o.stop(t + 0.25);
+    g.gain.linearRampToValueAtTime(vel, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
+    o.connect(f); f.connect(g); g.connect(musicMaster); g.connect(musicDelay);
+    o.start(t); o.stop(t + 0.13);
+}
+
+function openHatVoice(t) {
+    const src = audioCtx.createBufferSource();
+    src.buffer = getNoise();
+    const f = audioCtx.createBiquadFilter();
+    f.type = 'highpass'; f.frequency.value = 8000;
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(0.045, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    src.connect(f); f.connect(g); g.connect(musicMaster);
+    src.start(t); src.stop(t + 0.15);
 }
 
 function kickVoice(t) {
@@ -1789,36 +1812,19 @@ function playSfx(kind) {
             o.connect(g); g.connect(sfxMaster);
             o.start(st); o.stop(st + 0.2);
         });
-    } else if (kind === 'pass') {
-        // Dezenter Blip beim Durchqueren einer Lücke
-        const o = audioCtx.createOscillator();
-        o.type = 'sine'; o.frequency.value = 620;
-        const g = audioCtx.createGain();
-        g.gain.setValueAtTime(0, t);
-        g.gain.linearRampToValueAtTime(0.12, t + 0.012);
-        g.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
-        o.connect(g); g.connect(sfxMaster);
-        o.start(t); o.stop(t + 0.12);
     } else if (kind === 'risky') {
-        // Risky geschafft: aufsteigendes Funkeln
+        // Risky geschafft: dunkles, sattes Aufsteigen mit Punch
         const o = audioCtx.createOscillator();
         o.type = 'triangle';
-        o.frequency.setValueAtTime(700, t);
-        o.frequency.exponentialRampToValueAtTime(1400, t + 0.12);
+        o.frequency.setValueAtTime(350, t);
+        o.frequency.exponentialRampToValueAtTime(700, t + 0.14);
         const g = audioCtx.createGain();
         g.gain.setValueAtTime(0, t);
-        g.gain.linearRampToValueAtTime(0.2, t + 0.015);
-        g.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+        g.gain.linearRampToValueAtTime(0.24, t + 0.015);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.26);
         o.connect(g); g.connect(sfxMaster);
-        o.start(t); o.stop(t + 0.25);
-        const o2 = audioCtx.createOscillator();
-        o2.type = 'sine'; o2.frequency.value = 1870;
-        const g2 = audioCtx.createGain();
-        g2.gain.setValueAtTime(0, t + 0.09);
-        g2.gain.linearRampToValueAtTime(0.1, t + 0.11);
-        g2.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
-        o2.connect(g2); g2.connect(sfxMaster);
-        o2.start(t + 0.09); o2.stop(t + 0.28);
+        o.start(t); o.stop(t + 0.3);
+        sfxThump(t, 180, 90, 0.12, 0.18);
     } else if (kind === 'explode') {
         // Gesprengter Balken
         sfxNoise(t, 0.3, 'lowpass', 900, 0.5, 0.4);
