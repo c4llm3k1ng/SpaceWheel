@@ -389,7 +389,7 @@
     </div>
 
     <div id="ui-layer">
-        <span id="score-line">Score: <span id="score">0</span> | Highscore: <span id="highscore">0</span></span>
+        <span id="score-line">Score: <span id="score">0</span><span id="highscore-part"> | Highscore: <span id="highscore">0</span></span></span>
         <div id="level-banner">Stufe 1: Tutorial (Roter Fokus) 🔴</div>
     </div>
     <canvas id="gameCanvas" width="450" height="800"></canvas>
@@ -1561,6 +1561,7 @@ function startTutorial() {
     tutorialStep = 0;
     gamePaused = true;
     document.getElementById('score-line').style.display = 'none';
+    document.getElementById('highscore-part').style.display = 'none';
     document.getElementById('tutorial-overlay').style.display = 'block';
     document.getElementById('hamburger-btn').style.display = 'none';
     renderTutorialSlide();
@@ -1569,6 +1570,7 @@ function closeTutorial() {
     tutorialRestoreState();
     gamePaused = false;
     document.getElementById('score-line').style.display = '';
+    document.getElementById('highscore-part').style.display = '';
     document.getElementById('tutorial-overlay').style.display = 'none';
     document.getElementById('tut-resume-btn').style.display = 'none';
     const anyOverlay = ['auth-screen','leaderboard-screen','add-friend-screen','help-screen']
