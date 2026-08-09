@@ -146,6 +146,17 @@
         .tut-nav { display: flex; justify-content: space-between; align-items: center; }
         .tut-skip { background: none; border: none; color: #444; font-size: 13px; cursor: pointer; padding: 8px 0; }
         .tut-next { background: #ff007f; border: none; border-radius: 10px; color: #fff; font-size: 15px; font-weight: bold; padding: 10px 28px; cursor: pointer; }
+        .tut-back { background: #1e1f2e; border: 1px solid #2a2b3d; border-radius: 10px; color: #fff; font-size: 15px; padding: 10px 16px; cursor: pointer; }
+        .tut-try {
+            display: block; width: 100%; background: none; border: 1px solid #00f2fe;
+            border-radius: 10px; color: #00f2fe; font-size: 14px; font-weight: bold;
+            padding: 10px; cursor: pointer; margin-bottom: 12px;
+        }
+        #tut-resume-btn {
+            display: none; position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+            z-index: 250; background: #13141a; border: 1px solid #00f2fe; color: #00f2fe;
+            border-radius: 999px; padding: 10px 20px; font-size: 14px; font-weight: bold; cursor: pointer;
+        }
 
         #help-screen {
             display: none; position: fixed; inset: 0; z-index: 300;
@@ -257,12 +268,17 @@
             <div class="tut-icon" id="tut-icon"></div>
             <div class="tut-title" id="tut-title"></div>
             <div class="tut-text" id="tut-text"></div>
+            <button class="tut-try" id="tut-try-btn" onclick="tutorialTry()">🎮 Jetzt testen</button>
             <div class="tut-nav">
                 <button class="tut-skip" onclick="closeTutorial()">Überspringen</button>
-                <button class="tut-next" id="tut-next-btn" onclick="tutorialNext()">Weiter →</button>
+                <div style="display:flex;gap:8px;">
+                    <button class="tut-back" id="tut-back-btn" onclick="tutorialBack()">←</button>
+                    <button class="tut-next" id="tut-next-btn" onclick="tutorialNext()">Weiter →</button>
+                </div>
             </div>
         </div>
     </div>
+    <button id="tut-resume-btn" onclick="tutorialResume()">📖 Weiter im Tutorial</button>
 
     <!-- Help Screen -->
     <div id="help-screen">
@@ -1466,6 +1482,7 @@ function startTutorial() {
 }
 function closeTutorial() {
     document.getElementById('tutorial-overlay').style.display = 'none';
+    document.getElementById('tut-resume-btn').style.display = 'none';
     const anyOverlay = ['auth-screen','leaderboard-screen','add-friend-screen','help-screen']
         .some(s => document.getElementById(s).classList.contains('active'));
     if (!anyOverlay && !document.getElementById('hamburger-menu').classList.contains('active')) {
@@ -1480,6 +1497,21 @@ function tutorialNext() {
         closeTutorial();
     }
 }
+function tutorialBack() {
+    if (tutorialStep > 0) {
+        tutorialStep--;
+        renderTutorialSlide();
+    }
+}
+function tutorialTry() {
+    document.getElementById('tutorial-overlay').style.display = 'none';
+    document.getElementById('tut-resume-btn').style.display = 'block';
+}
+function tutorialResume() {
+    document.getElementById('tut-resume-btn').style.display = 'none';
+    document.getElementById('tutorial-overlay').style.display = 'block';
+    renderTutorialSlide();
+}
 function renderTutorialSlide() {
     const slide = TUTORIAL_SLIDES[tutorialStep];
     document.getElementById('tut-icon').textContent = slide.icon;
@@ -1487,6 +1519,8 @@ function renderTutorialSlide() {
     document.getElementById('tut-text').textContent = slide.text;
     const isLast = tutorialStep === TUTORIAL_SLIDES.length - 1;
     document.getElementById('tut-next-btn').textContent = isLast ? 'Fertig ✓' : 'Weiter →';
+    document.getElementById('tut-back-btn').style.visibility = tutorialStep === 0 ? 'hidden' : 'visible';
+    document.getElementById('tut-try-btn').style.display = isLast ? 'none' : 'block';
     const dots = document.getElementById('tut-dots');
     dots.innerHTML = TUTORIAL_SLIDES.map((_, i) =>
         `<div class="tut-dot${i === tutorialStep ? ' active' : ''}"></div>`
