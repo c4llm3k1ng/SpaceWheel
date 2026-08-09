@@ -412,6 +412,7 @@ let tutorialTestActive = false;
 let tutorialNoSpawn = false;
 let tutorialItemBoost = false;
 let tutorialForceType = null;
+let tutorialFirstColor = null;
 let tutSavedState = null;
 
 const orbitX = canvas.width / 2;
@@ -964,11 +965,17 @@ function createObstacle() {
     // Tutorial-Test: erzwungener Hindernis-Typ, ohne Items (früher Return)
     if (tutorialForceType) {
         if (tutorialForceType === 'SINGLE') {
-            let tPool = [COLOR_PINK];
-            if (score >= 12) tPool.push(COLOR_CYAN);
-            if (score >= 51) tPool.push(COLOR_YELLOW);
-            if (score >= 125) tPool.push(COLOR_PURPLE);
-            obstacleColor = tPool[Math.floor(Math.random() * tPool.length)];
+            if (tutorialFirstColor) {
+                // Der erste Balken zeigt die neu hinzugekommene Farbe
+                obstacleColor = tutorialFirstColor;
+                tutorialFirstColor = null;
+            } else {
+                let tPool = [COLOR_PINK];
+                if (score >= 12) tPool.push(COLOR_CYAN);
+                if (score >= 51) tPool.push(COLOR_YELLOW);
+                if (score >= 125) tPool.push(COLOR_PURPLE);
+                obstacleColor = tPool[Math.floor(Math.random() * tPool.length)];
+            }
         } else if (tutorialForceType === 'DUAL') {
             obstacleType = TYPE_DUAL_GAP;
             obstacleColor = Math.random() > 0.5 ? [COLOR_PINK, COLOR_CYAN] : [COLOR_CYAN, COLOR_PINK];
@@ -1539,11 +1546,11 @@ const TUTORIAL_SLIDES = [
     { icon: '🎯', title: 'Risky Bonus', text: 'Wenn du sehr nah am Rand einer Lücke bleibst, gibt es +2 statt +1 Punkt.\n3 Riskys hintereinander = Triple Risky (+2 Bonus)!\n10 in Folge = Magical Risky (+10 Bonus)!',
       test: { score: 0, force: 'SINGLE', showScore: true } },
     { icon: '🔵', title: 'Zwei Farben', text: 'Ab Score 12 kommt die Cyan-Kugel dazu. Jeder Balken hat eine Farbe – die Kugel mit der passenden Farbe muss durch die Lücke.',
-      test: { score: 12, force: 'SINGLE' } },
+      test: { score: 12, force: 'SINGLE', firstColor: COLOR_CYAN } },
     { icon: '🌟', title: 'Drei Farben', text: 'Ab Score 51 kommt Gelb dazu. Behalte alle Kugeln im Blick und drehe die richtige Kugel zur Lücke!',
-      test: { score: 51, force: 'SINGLE' } },
+      test: { score: 51, force: 'SINGLE', firstColor: COLOR_YELLOW } },
     { icon: '🟣', title: 'Vier Farben', text: 'Ab Score 125 vervollständigt Lila das Rad. Jetzt zählt jede Vierteldrehung!',
-      test: { score: 125, force: 'SINGLE' } },
+      test: { score: 125, force: 'SINGLE', firstColor: COLOR_PURPLE } },
     { icon: '👥', title: 'Doppel-Balken', text: 'Zwei Balken mit zwei Lücken gleichzeitig – links und rechts. BEIDE Kugeln müssen durch ihre jeweilige Lücke!',
       test: { score: 12, force: 'DUAL' } },
     { icon: '🦓', title: 'Zebra-Balken', text: 'Gestreifte Balken gelten für mehrere Farben gleichzeitig. Auch hier reicht es, wenn eine der passenden Kugeln die Lücke trifft.',
@@ -1614,6 +1621,7 @@ function tutorialTry() {
     tutorialNoSpawn = !!cfg.noSpawn;
     tutorialItemBoost = !!cfg.itemBoost;
     tutorialForceType = cfg.force || null;
+    tutorialFirstColor = cfg.firstColor || null;
     scoreEl.innerText = score;
     document.getElementById('score-line').style.display = cfg.showScore ? '' : 'none';
     spawnTimer = tutorialNoSpawn ? 0 : 9999;
@@ -1647,6 +1655,7 @@ function tutorialRestoreState() {
     tutorialNoSpawn = false;
     tutorialItemBoost = false;
     tutorialForceType = null;
+    tutorialFirstColor = null;
 }
 function tutorialResume() {
     tutorialRestoreState();
