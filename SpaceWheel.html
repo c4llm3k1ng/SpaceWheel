@@ -407,6 +407,11 @@
                 <div style="flex:1;"><div class="help-name">Hintergrundmusik</div><div class="help-desc">Ruhiger Space-Synth-Loop während des Spielens</div></div>
                 <button id="music-toggle-btn" class="tut-next" onclick="toggleMusic()" style="padding:8px 16px;font-size:13px;">An 🔊</button>
             </div>
+            <div class="help-item" style="align-items:center;">
+                <div class="help-icon">💥</div>
+                <div style="flex:1;"><div class="help-name">Soundeffekte</div><div class="help-desc">Sounds für Items, Sprengungen und Kollisionen</div></div>
+                <button id="sfx-toggle-btn" class="tut-next" onclick="toggleSfx()" style="padding:8px 16px;font-size:13px;">An 🔊</button>
+            </div>
         </div>
     </div>
 
@@ -724,6 +729,7 @@ function update() {
                 obs.passed = true;
                 score += 1;
                 scoreEl.innerText = score;
+                playSfx('explode');
                 createFloatingText("💥 +1 Gesprengt!", orbitX, orbitY - 50);
                 continue;
             }
@@ -763,6 +769,7 @@ function update() {
                     if (hasShield) {
                         hasShield = false;
                         obs.passed = true;
+                        playSfx('shield');
                         createFloatingText("🛡️ Schild verloren!", orbitX, orbitY - 50);
                         triggerJuiceEffect('#ffffff');
                     } else {
@@ -803,6 +810,7 @@ function update() {
                     if (hasShield) {
                         hasShield = false;
                         obs.passed = true;
+                        playSfx('shield');
                         createFloatingText("🛡️ Schild verloren!", orbitX, orbitY - 50);
                         triggerJuiceEffect('#ffffff');
                     } else {
@@ -838,6 +846,7 @@ function update() {
                     if (hasShield) {
                         hasShield = false;
                         obs.passed = true;
+                        playSfx('shield');
                         createFloatingText("🛡️ Schild verloren!", orbitX, orbitY - 50);
                         triggerJuiceEffect('#ffffff');
                     } else {
@@ -881,6 +890,7 @@ function update() {
                     if (hasShield) {
                         hasShield = false;
                         obs.passed = true;
+                        playSfx('shield');
                         createFloatingText("🛡️ Schild verloren!", orbitX, orbitY - 50);
                         triggerJuiceEffect('#ffffff');
                     } else {
@@ -912,6 +922,7 @@ function update() {
 }
 
 function activateItem(effect) {
+    playSfx('pickup');
     if (effect === ITEM_STAR) {
         starPowerTimer = 6.2;
         createFloatingText("🌟 STAR POWER! UNSTERBLICH!", orbitX, orbitY - 50);
@@ -1187,6 +1198,7 @@ function triggerJuiceEffect(color) {
 }
 
 function triggerGameOver() {
+    playSfx('crash');
     if (tutorialTestActive) {
         // Im Tutorial-Test kein echtes Game Over: Feld leeren und weiterprobieren
         obstacles = []; items = [];
@@ -1583,11 +1595,13 @@ function closeSettings() {
     openHamburger();
 }
 
-// ── Hintergrundmusik (prozedural per Web Audio) ─────────────
+// ── Hintergrundmusik & Soundeffekte (prozedural per Web Audio) ──
 let musicEnabled = localStorage.getItem('sw_music') !== 'off';
-let audioCtx = null, musicMaster = null, musicDelay = null, musicDelayGain = null;
+let sfxEnabled = localStorage.getItem('sw_sfx') !== 'off';
+let audioCtx = null, musicMaster = null, sfxMaster = null;
+let musicDelay = null, musicDelayGain = null, noiseBuf = null;
 let musicTimer = null, eighthCount = 0, nextEighthTime = 0;
-const MUSIC_BPM = 96;
+const MUSIC_BPM = 122;
 const EIGHTH = 60 / MUSIC_BPM / 2;
 // 4 Akkorde à 2 Takte: Am(add9) – Fmaj7 – Cmaj7 – G6
 const MUSIC_CHORDS = [
@@ -1596,27 +1610,44 @@ const MUSIC_CHORDS = [
     { bass: 48, pad: [55, 59, 60, 64], arp: [67, 72, 76, 79] },
     { bass: 43, pad: [55, 59, 62, 64], arp: [67, 71, 74, 79] }
 ];
-const ARP_PATTERN = [0, -1, 1, 2, -1, 3, -1, 2, 0, 2, -1, 1, 3, -1, 2, -1];
+const ARP_PATTERN = [0, 1, 2, 1, 3, 2, 1, 2, 0, 2, 3, 1, 2, 3, 2, 1];
+const BASS_OFFSETS = [0, 0, 0, 12, 0, 0, 12, 0];
 
 function midiFreq(m) { return 440 * Math.pow(2, (m - 69) / 12); }
 
+function ensureAudioCtx() {
+    if (audioCtx) return;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    musicMaster = audioCtx.createGain();
+    musicMaster.gain.value = 0.22;
+    musicMaster.connect(audioCtx.destination);
+    sfxMaster = audioCtx.createGain();
+    sfxMaster.gain.value = 0.5;
+    sfxMaster.connect(audioCtx.destination);
+    // Echo für das Arpeggio (punktierte Achtel)
+    musicDelay = audioCtx.createDelay(1.0);
+    musicDelay.delayTime.value = EIGHTH * 1.5;
+    musicDelayGain = audioCtx.createGain();
+    musicDelayGain.gain.value = 0.28;
+    musicDelay.connect(musicDelayGain);
+    musicDelayGain.connect(musicDelay);
+    musicDelayGain.connect(musicMaster);
+}
+
+function getNoise() {
+    if (!noiseBuf) {
+        noiseBuf = audioCtx.createBuffer(1, audioCtx.sampleRate, audioCtx.sampleRate);
+        const d = noiseBuf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    return noiseBuf;
+}
+
 function ensureMusicStarted() {
     if (!musicEnabled) return;
-    if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        musicMaster = audioCtx.createGain();
-        musicMaster.gain.value = 0.22;
-        musicMaster.connect(audioCtx.destination);
-        // Echo für das Arpeggio (punktierte Achtel)
-        musicDelay = audioCtx.createDelay(1.0);
-        musicDelay.delayTime.value = EIGHTH * 1.5;
-        musicDelayGain = audioCtx.createGain();
-        musicDelayGain.gain.value = 0.32;
-        musicDelay.connect(musicDelayGain);
-        musicDelayGain.connect(musicDelay);
-        musicDelayGain.connect(musicMaster);
-    }
+    ensureAudioCtx();
     if (audioCtx.state === 'suspended') audioCtx.resume();
+    musicMaster.gain.setTargetAtTime(0.22, audioCtx.currentTime, 0.1);
     if (!musicTimer) {
         eighthCount = 0;
         nextEighthTime = audioCtx.currentTime + 0.1;
@@ -1645,9 +1676,13 @@ function playEighth(step, t) {
     const chord = MUSIC_CHORDS[Math.floor(step / 16) % 4];
     const si = step % 16;
     if (si === 0) chord.pad.forEach(n => padVoice(midiFreq(n), t, 16 * EIGHTH));
-    if (si % 4 === 0) bassVoice(midiFreq(chord.bass + (si === 8 ? 12 : 0)), t);
-    const ai = ARP_PATTERN[si];
-    if (ai >= 0) arpVoice(midiFreq(chord.arp[ai]), t, si % 4 === 0 ? 0.09 : 0.06);
+    // Kick auf jedem Beat, Hihat dazwischen, Snare auf 2 und 4
+    if (si % 2 === 0) kickVoice(t);
+    else hatVoice(t);
+    if (si % 8 === 2 || si % 8 === 6) snareVoice(t);
+    // Treibender Achtel-Bass mit Oktavsprüngen
+    bassVoice(midiFreq(chord.bass + BASS_OFFSETS[si % 8]), t);
+    arpVoice(midiFreq(chord.arp[ARP_PATTERN[si]]), t, si % 2 === 0 ? 0.05 : 0.035);
 }
 
 function padVoice(freq, t, dur) {
@@ -1655,11 +1690,11 @@ function padVoice(freq, t, dur) {
         const o = audioCtx.createOscillator();
         o.type = 'sawtooth'; o.frequency.value = freq; o.detune.value = det;
         const f = audioCtx.createBiquadFilter();
-        f.type = 'lowpass'; f.frequency.value = 750; f.Q.value = 0.5;
+        f.type = 'lowpass'; f.frequency.value = 1100; f.Q.value = 0.5;
         const g = audioCtx.createGain();
         g.gain.setValueAtTime(0, t);
-        g.gain.linearRampToValueAtTime(0.05, t + 1.4);
-        g.gain.setValueAtTime(0.05, t + dur - 1.2);
+        g.gain.linearRampToValueAtTime(0.035, t + 0.6);
+        g.gain.setValueAtTime(0.035, t + dur - 0.8);
         g.gain.linearRampToValueAtTime(0, t + dur);
         o.connect(f); f.connect(g); g.connect(musicMaster);
         o.start(t); o.stop(t + dur + 0.1);
@@ -1668,13 +1703,15 @@ function padVoice(freq, t, dur) {
 
 function bassVoice(freq, t) {
     const o = audioCtx.createOscillator();
-    o.type = 'triangle'; o.frequency.value = freq;
+    o.type = 'sawtooth'; o.frequency.value = freq;
+    const f = audioCtx.createBiquadFilter();
+    f.type = 'lowpass'; f.frequency.value = 420; f.Q.value = 1.2;
     const g = audioCtx.createGain();
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.16, t + 0.03);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
-    o.connect(g); g.connect(musicMaster);
-    o.start(t); o.stop(t + 0.6);
+    g.gain.linearRampToValueAtTime(0.14, t + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+    o.connect(f); f.connect(g); g.connect(musicMaster);
+    o.start(t); o.stop(t + 0.25);
 }
 
 function arpVoice(freq, t, vel) {
@@ -1682,10 +1719,112 @@ function arpVoice(freq, t, vel) {
     o.type = 'triangle'; o.frequency.value = freq;
     const g = audioCtx.createGain();
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(vel, t + 0.015);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+    g.gain.linearRampToValueAtTime(vel, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
     o.connect(g); g.connect(musicMaster); g.connect(musicDelay);
-    o.start(t); o.stop(t + 0.35);
+    o.start(t); o.stop(t + 0.25);
+}
+
+function kickVoice(t) {
+    const o = audioCtx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(150, t);
+    o.frequency.exponentialRampToValueAtTime(45, t + 0.11);
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(0.5, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
+    o.connect(g); g.connect(musicMaster);
+    o.start(t); o.stop(t + 0.15);
+}
+
+function hatVoice(t) {
+    const src = audioCtx.createBufferSource();
+    src.buffer = getNoise();
+    const f = audioCtx.createBiquadFilter();
+    f.type = 'highpass'; f.frequency.value = 7000;
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(0.05, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+    src.connect(f); f.connect(g); g.connect(musicMaster);
+    src.start(t); src.stop(t + 0.08);
+}
+
+function snareVoice(t) {
+    const src = audioCtx.createBufferSource();
+    src.buffer = getNoise();
+    const f = audioCtx.createBiquadFilter();
+    f.type = 'bandpass'; f.frequency.value = 1800; f.Q.value = 0.8;
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(0.16, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
+    src.connect(f); f.connect(g); g.connect(musicMaster);
+    src.start(t); src.stop(t + 0.16);
+}
+
+// ── Soundeffekte ────────────────────────────────────────────
+function playSfx(kind) {
+    if (!sfxEnabled) return;
+    ensureAudioCtx();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const t = audioCtx.currentTime + 0.01;
+    if (kind === 'pickup') {
+        // Aufsteigender Doppel-Blip beim Item-Einsammeln
+        [880, 1320].forEach((fr, i) => {
+            const o = audioCtx.createOscillator();
+            o.type = 'sine'; o.frequency.value = fr;
+            const g = audioCtx.createGain();
+            const st = t + i * 0.07;
+            g.gain.setValueAtTime(0, st);
+            g.gain.linearRampToValueAtTime(0.25, st + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.001, st + 0.18);
+            o.connect(g); g.connect(sfxMaster);
+            o.start(st); o.stop(st + 0.2);
+        });
+    } else if (kind === 'explode') {
+        // Gesprengter Balken
+        sfxNoise(t, 0.3, 'lowpass', 900, 0.5, 0.4);
+        sfxThump(t, 120, 40, 0.25, 0.3);
+    } else if (kind === 'crash') {
+        // Aufprall an Balken oder Bombe
+        sfxNoise(t, 0.5, 'lowpass', 700, 0.5, 0.55);
+        sfxThump(t, 160, 30, 0.45, 0.5);
+    } else if (kind === 'shield') {
+        // Schild fängt Treffer ab: metallischer Ping
+        const o = audioCtx.createOscillator();
+        o.type = 'triangle';
+        o.frequency.setValueAtTime(1500, t);
+        o.frequency.exponentialRampToValueAtTime(500, t + 0.25);
+        const g = audioCtx.createGain();
+        g.gain.setValueAtTime(0.3, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+        o.connect(g); g.connect(sfxMaster);
+        o.start(t); o.stop(t + 0.35);
+        sfxNoise(t, 0.15, 'highpass', 3000, 1, 0.15);
+    }
+}
+
+function sfxNoise(t, dur, type, freq, q, gain) {
+    const src = audioCtx.createBufferSource();
+    src.buffer = getNoise();
+    const f = audioCtx.createBiquadFilter();
+    f.type = type; f.frequency.value = freq; f.Q.value = q;
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(gain, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    src.connect(f); f.connect(g); g.connect(sfxMaster);
+    src.start(t); src.stop(t + dur + 0.05);
+}
+
+function sfxThump(t, f0, f1, dur, gain) {
+    const o = audioCtx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(gain, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(g); g.connect(sfxMaster);
+    o.start(t); o.stop(t + dur + 0.05);
 }
 
 function toggleMusic() {
@@ -1695,10 +1834,20 @@ function toggleMusic() {
     updateMusicToggleLabel();
 }
 
+function toggleSfx() {
+    sfxEnabled = !sfxEnabled;
+    localStorage.setItem('sw_sfx', sfxEnabled ? 'on' : 'off');
+    if (sfxEnabled) playSfx('pickup');
+    updateMusicToggleLabel();
+}
+
 function updateMusicToggleLabel() {
     const b = document.getElementById('music-toggle-btn');
     b.textContent = musicEnabled ? 'An 🔊' : 'Aus 🔇';
     b.style.background = musicEnabled ? '#ff007f' : '#2a2b3d';
+    const sb = document.getElementById('sfx-toggle-btn');
+    sb.textContent = sfxEnabled ? 'An 🔊' : 'Aus 🔇';
+    sb.style.background = sfxEnabled ? '#ff007f' : '#2a2b3d';
 }
 
 // Browser erlauben Audio erst nach einer Nutzer-Interaktion
