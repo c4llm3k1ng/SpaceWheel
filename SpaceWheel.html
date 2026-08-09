@@ -402,7 +402,12 @@ let highscore = localStorage.getItem('orbit_highscore_v46') || 0;
 highscoreEl.innerText = highscore;
 
 let gameOver = false;
-let lastTime = performance.now(); 
+let lastTime = performance.now();
+let gamePaused = false;
+let tutorialTestActive = false;
+let tutorialNoSpawn = false;
+let tutorialItemBoost = false;
+let tutSavedState = null;
 
 const orbitX = canvas.width / 2;
 const orbitY = canvas.height * 0.72; 
@@ -617,7 +622,7 @@ function update() {
     }
     spawnTimer += timerProgress;
 
-    if (spawnTimer >= currentRequiredInterval) {
+    if (spawnTimer >= currentRequiredInterval && !tutorialNoSpawn) {
         spawnTimer = 0;
         createObstacle();
     }
@@ -1036,7 +1041,7 @@ function createObstacle() {
     }
 
     // KORREKTUR: Frequenz auf mathematisch exakte 28% eingestellt (Gerundete 27,5%)
-    if (score >= 8 && itemCooldownBalken === 0 && Math.random() < 0.28) { 
+    if ((score >= 8 || tutorialItemBoost) && itemCooldownBalken === 0 && (tutorialItemBoost || Math.random() < 0.28)) {
         let itemX = orbitX + (Math.random() * 120 - 60);
         let itemPool = [COLOR_PINK];
         if (score >= 12) itemPool.push(COLOR_CYAN);
@@ -1060,7 +1065,7 @@ function createObstacle() {
             rotation: Math.random() * Math.PI, size: 24
         });
 
-        itemCooldownBalken = 10;
+        itemCooldownBalken = tutorialItemBoost ? 1 : 10;
     }
 
     obstacles.push({
@@ -1099,6 +1104,13 @@ function triggerJuiceEffect(color) {
 }
 
 function triggerGameOver() {
+    if (tutorialTestActive) {
+        // Im Tutorial-Test kein echtes Game Over: Feld leeren und weiterprobieren
+        obstacles = []; items = [];
+        spawnTimer = 9999;
+        createFloatingText("💥 Getroffen! Versuch's weiter", orbitX, orbitY - 50);
+        return;
+    }
     gameOver = true; isDragging = false;
     if (score > highscore) {
         highscore = score;
@@ -1412,7 +1424,15 @@ function draw() {
     }
 }
 
-function loop() { update(); draw(); requestAnimationFrame(loop); }
+function loop() {
+    if (gamePaused) {
+        lastTime = performance.now();
+    } else {
+        update();
+    }
+    draw();
+    requestAnimationFrame(loop);
+}
 loop();
 
 // === FIREBASE ===
@@ -1440,6 +1460,7 @@ function showScreen(id) {
     closeTutorial();
     if (id) document.getElementById(id).classList.add('active');
     document.getElementById('hamburger-btn').style.display = id ? 'none' : 'flex';
+    gamePaused = !!id;
 }
 
 // ── Hamburger Menu ──────────────────────────────────────────
@@ -1447,20 +1468,24 @@ function openHamburger() {
     document.getElementById('hamburger-menu').classList.add('active');
     document.getElementById('hamburger-btn').style.display = 'none';
     closeTutorial();
+    gamePaused = true;
 }
 function closeHamburger() {
     document.getElementById('hamburger-menu').classList.remove('active');
     document.getElementById('hamburger-btn').style.display = 'flex';
+    gamePaused = false;
 }
 
 // ── Help Screen ─────────────────────────────────────────────
 function openHelp() {
     document.getElementById('help-screen').classList.add('active');
     document.getElementById('hamburger-btn').style.display = 'none';
+    gamePaused = true;
 }
 function closeHelp() {
     document.getElementById('help-screen').classList.remove('active');
     document.getElementById('hamburger-btn').style.display = 'flex';
+    gamePaused = false;
 }
 
 // ── Tutorial ────────────────────────────────────────────────
@@ -1476,11 +1501,14 @@ let tutorialStep = 0;
 
 function startTutorial() {
     tutorialStep = 0;
+    gamePaused = true;
     document.getElementById('tutorial-overlay').style.display = 'block';
     document.getElementById('hamburger-btn').style.display = 'none';
     renderTutorialSlide();
 }
 function closeTutorial() {
+    tutorialRestoreState();
+    gamePaused = false;
     document.getElementById('tutorial-overlay').style.display = 'none';
     document.getElementById('tut-resume-btn').style.display = 'none';
     const anyOverlay = ['auth-screen','leaderboard-screen','add-friend-screen','help-screen']
@@ -1504,10 +1532,70 @@ function tutorialBack() {
     }
 }
 function tutorialTry() {
+    // Echten Spielstand sichern, dann Sandbox für den aktuellen Schritt aufbauen
+    tutSavedState = {
+        score, obstacles, items, particles, gameOver,
+        spawnTimer, currentRequiredInterval, slowMotionTimer, hasShield,
+        clearTimer, starPowerTimer, wideGapTimer, itemCooldownBalken,
+        lastPattern, lastColorStr, colorStreakCount, perfectStreak
+    };
+    tutorialTestActive = true;
+    obstacles = []; items = []; particles = [];
+    gameOver = false;
+    slowMotionTimer = 0; hasShield = false; clearTimer = 0;
+    starPowerTimer = 0; wideGapTimer = 0; itemCooldownBalken = 0;
+    lastPattern = -1; lastColorStr = ''; colorStreakCount = 0; perfectStreak = 0;
+    currentRequiredInterval = FIXED_INTERVAL;
+    tutorialNoSpawn = false;
+    tutorialItemBoost = false;
+
+    // Szenario je Tutorial-Schritt
+    if (tutorialStep === 0) {          // Steuerung: freies Drehen ohne Hindernisse
+        score = 0; tutorialNoSpawn = true;
+    } else if (tutorialStep === 1) {   // Kugeln: alle vier sichtbar, keine Balken
+        score = 125; tutorialNoSpawn = true;
+    } else if (tutorialStep === 2) {   // Balken: einfache pinke Balken im Startempo
+        score = 0;
+    } else if (tutorialStep === 3) {   // Risky: einfache Balken zum Rand-Streifen
+        score = 0;
+    } else if (tutorialStep === 4) {   // Items: bei jedem Balken erscheint ein Item
+        score = 10; tutorialItemBoost = true;
+    }
+    scoreEl.innerText = score;
+    spawnTimer = tutorialNoSpawn ? 0 : 9999;
+
+    gamePaused = false;
     document.getElementById('tutorial-overlay').style.display = 'none';
     document.getElementById('tut-resume-btn').style.display = 'block';
 }
+function tutorialRestoreState() {
+    if (!tutSavedState) return;
+    score = tutSavedState.score;
+    obstacles = tutSavedState.obstacles;
+    items = tutSavedState.items;
+    particles = tutSavedState.particles;
+    gameOver = tutSavedState.gameOver;
+    spawnTimer = tutSavedState.spawnTimer;
+    currentRequiredInterval = tutSavedState.currentRequiredInterval;
+    slowMotionTimer = tutSavedState.slowMotionTimer;
+    hasShield = tutSavedState.hasShield;
+    clearTimer = tutSavedState.clearTimer;
+    starPowerTimer = tutSavedState.starPowerTimer;
+    wideGapTimer = tutSavedState.wideGapTimer;
+    itemCooldownBalken = tutSavedState.itemCooldownBalken;
+    lastPattern = tutSavedState.lastPattern;
+    lastColorStr = tutSavedState.lastColorStr;
+    colorStreakCount = tutSavedState.colorStreakCount;
+    perfectStreak = tutSavedState.perfectStreak;
+    tutSavedState = null;
+    scoreEl.innerText = score;
+    tutorialTestActive = false;
+    tutorialNoSpawn = false;
+    tutorialItemBoost = false;
+}
 function tutorialResume() {
+    tutorialRestoreState();
+    gamePaused = true;
     document.getElementById('tut-resume-btn').style.display = 'none';
     document.getElementById('tutorial-overlay').style.display = 'block';
     renderTutorialSlide();
