@@ -134,3 +134,27 @@ Zusätzlich relevant (unverändert in Version 1, hier nur als Referenz):
 kickVoice (Sine-Drop 150→45 Hz), hatVoice (Highpass-Noise 7 kHz, leise),
 snareVoice (Bandpass-Noise 1,8 kHz), Delay-Echo mit `EIGHTH * 1.5` und
 Feedback 0.35, Master-Lautstärke im Spiel 0.22.
+
+---
+
+## Version 2 — "Hymnisch Em–C–G–D" (2026-08-10)
+
+Stand von Commit `63f3673`. Wie Version 1, aber mit hymnischer Akkordfolge
+Em–C–G–D, neuem Riff (Zielton → schneller Doppelschlag → gehaltener
+Schlington, F#-Hängeton zieht zum Loop-Anfang) und gerade aufsteigendem
+Arpeggio. Alle Voices identisch zu Version 1. User-Urteil: "auch okay".
+
+```javascript
+// VERSION 2 (Experiment) — hymnische Folge: Em – C – G – D
+const MUSIC_CHORDS = [
+    { bass: 40, arpRoot: 52, minor: true,
+      melody: { 0:[76,3], 4:[79,1], 6:[78,1], 8:[76,4], 14:[74,2], 16:[76,3], 22:[71,8] } },
+    { bass: 48, arpRoot: 60, minor: false,
+      melody: { 0:[72,3], 4:[76,1], 6:[74,1], 8:[72,4], 14:[71,2], 16:[72,3], 22:[76,8] } },
+    { bass: 43, arpRoot: 55, minor: false,
+      melody: { 0:[74,3], 4:[79,1], 6:[78,1], 8:[74,4], 14:[71,2], 16:[74,3], 22:[79,8] } },
+    { bass: 50, arpRoot: 62, minor: false,
+      melody: { 0:[74,3], 4:[78,1], 6:[76,1], 8:[74,4], 14:[71,2], 16:[69,3], 22:[78,8] } }
+];
+const ARP_SEQ = [0, 1, 2, 3, 0, 1, 2, 3, 0, 2, 1, 3, 0, 1, 3, 2];
+```
