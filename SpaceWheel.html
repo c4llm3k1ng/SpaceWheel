@@ -435,6 +435,7 @@ highscoreEl.innerText = highscore;
 let gameOver = false;
 let lastTime = performance.now();
 let gamePaused = true; // Start pausiert: erst nach Login/Gast-Wahl läuft das Spiel
+let audioCtx = null, musicMaster = null, sfxMaster = null;
 let tutorialTestActive = false;
 let tutorialNoSpawn = false;
 let tutorialItemBoost = false;
@@ -1617,7 +1618,6 @@ function closeSettings() {
 // ── Hintergrundmusik & Soundeffekte (prozedural per Web Audio) ──
 let musicEnabled = localStorage.getItem('sw_music') !== 'off';
 let sfxEnabled = localStorage.getItem('sw_sfx') !== 'off';
-let audioCtx = null, musicMaster = null, sfxMaster = null;
 let musicDelay = null, musicDelayGain = null, noiseBuf = null;
 let musicTimer = null, eighthCount = 0, nextEighthTime = 0;
 const MUSIC_BPM = 150;
