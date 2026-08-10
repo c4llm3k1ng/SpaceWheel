@@ -366,7 +366,7 @@
             </div>
             <div class="help-item">
                 <div class="help-icon">💥</div>
-                <div><div class="help-name">Sprengung (5,7 s)</div><div class="help-desc">Alle aktuellen Balken auf dem Bildschirm werden entfernt.</div></div>
+                <div><div class="help-name">Sprengung (4 Balken)</div><div class="help-desc">Die nächsten 4 Balken explodieren automatisch, sobald sie sichtbar werden – jeder gibt +1 Punkt.</div></div>
             </div>
             <div class="help-item">
                 <div class="help-icon">↔</div>
@@ -474,7 +474,7 @@ let lastPattern = -1;
 let slowMotionTimer = 0;
 let hasShield = false;
 let shieldTimer = 0;
-let clearTimer = 0;
+let clearCharges = 0; // Sprengung: Anzahl noch zu sprengender Balken
 let starPowerTimer = 0; 
 let itemCooldownBalken = 0;
 let wideGapTimer = 0;
@@ -569,7 +569,7 @@ function resetGame() {
     slowMotionTimer = 0;
     hasShield = false;
     shieldTimer = 0;
-    clearTimer = 0;
+    clearCharges = 0;
     starPowerTimer = 0;
     itemCooldownBalken = 0;
     wideGapTimer = 0;
@@ -619,7 +619,6 @@ function update() {
     const prevStarPower = starPowerTimer;
     if (starPowerTimer > 0) starPowerTimer = Math.max(0, starPowerTimer - dt);
     if (slowMotionTimer > 0) slowMotionTimer = Math.max(0, slowMotionTimer - dt);
-    if (clearTimer > 0) clearTimer = Math.max(0, clearTimer - dt);
     if (wideGapTimer > 0) wideGapTimer = Math.max(0, wideGapTimer - dt);
     if (hasShield) {
         shieldTimer = Math.max(0, shieldTimer - dt);
@@ -641,8 +640,8 @@ function update() {
     } else if (slowMotionTimer > 0) {
         levelEl.innerText = '⏳ ZEITLUPE AKTIV';
         levelEl.style.color = '#00f2fe';
-    } else if (clearTimer > 0) {
-        levelEl.innerText = '💥 SPRENGUNG AKTIV';
+    } else if (clearCharges > 0) {
+        levelEl.innerText = '💥 SPRENGUNG: noch ' + clearCharges + ' Balken';
         levelEl.style.color = '#ff3300';
     } else if (wideGapTimer > 0) {
         levelEl.innerText = '↔ BREITE LÜCKEN AKTIV';
@@ -705,7 +704,13 @@ function update() {
 
     for (let i = obstacles.length - 1; i >= 0; i--) {
         let obs = obstacles[i];
-        obs.y += currentSpeed * dt; 
+        obs.y += currentSpeed * dt;
+
+        // Sprengung: Balken explodiert, sobald er sichtbar wird
+        if (clearCharges > 0 && !obs.isAutoExploded && !obs.passed && obs.y >= -obs.height) {
+            explodeBar(obs);
+        }
+
 
         // --- HIER MUSS DER CODE REIN ---
         let passedY = orbitY + orbitRadius + sphereRadius;
@@ -740,7 +745,6 @@ function update() {
                 obs.passed = true;
                 score += 1;
                 scoreEl.innerText = score;
-                playSfx('explode');
                 createFloatingText("💥 +1 Gesprengt!", orbitX, orbitY - 50);
                 continue;
             }
@@ -976,22 +980,29 @@ function activateItem(effect) {
         wideGapTimer = 5.2;
         createFloatingText("↔ BREITE LÜCKEN!", orbitX, orbitY - 50);
     } else if (effect === ITEM_CLEAR) {
-        let explodedCount = 0;
-        for (let o of obstacles) {
-            if (explodedCount < 3 && !o.passed) {
-                o.isAutoExploded = true;
-                explodedCount++;
-            }
-        }
-        clearTimer = 5.7;
+        // Sprengt die nächsten 4 Balken — jeder explodiert einzeln, sobald sichtbar
+        clearCharges = 4;
         createFloatingText("💥 SPRENGUNG!", orbitX, orbitY - 50);
-        for (let j = 0; j < 50; j++) {
-            particles.push({
-                x: Math.random() * canvas.width, y: Math.random() * (canvas.height * 0.6),
-                vx: Math.random() * 10 - 5, vy: Math.random() * 10 - 5,
-                color: '#ff3300', alpha: 1, size: Math.random() * 4 + 2
-            });
+        for (let o of obstacles) {
+            if (clearCharges <= 0) break;
+            if (!o.passed && !o.isAutoExploded && o.y >= -o.height) explodeBar(o);
         }
+    }
+}
+
+function explodeBar(obs) {
+    obs.isAutoExploded = true;
+    clearCharges--;
+    playSfx('explode');
+    for (let j = 0; j < 45; j++) {
+        particles.push({
+            x: Math.random() * canvas.width,
+            y: obs.y + Math.random() * obs.height,
+            vx: Math.random() * 10 - 5,
+            vy: Math.random() * 8 - 3,
+            color: Math.random() > 0.5 ? '#ff6600' : '#ffcc00',
+            alpha: 1, size: Math.random() * 5 + 2
+        });
     }
 }
 
@@ -1029,10 +1040,9 @@ function awardPoints(closestDist, color) {
 }
 
 function createObstacle() {
+    // Sprengung wirkt nicht mehr beim Spawn, sondern sobald der Balken
+    // sichtbar wird (siehe explodeBar im Update-Loop)
     let autoPass = false;
-    if (clearTimer > 0) {
-        autoPass = true;
-    }
 
     let type = Math.floor(Math.random() * 3);
     while (type === lastPattern) {
@@ -1517,7 +1527,6 @@ function draw() {
     const activeTimers = [
         { t: starPowerTimer,  max: 6.2, color: '#ffcc00', icon: '🌟' },
         { t: slowMotionTimer, max: 5.2, color: '#00f2fe', icon: '⏳' },
-        { t: clearTimer,      max: 5.7, color: '#ff3300', icon: '💥' },
         { t: wideGapTimer,    max: 5.2, color: '#aa00ff', icon: '↔'  },
         { t: shieldTimer,     max: 10.2, color: '#ffffff', icon: '🛡️' },
     ].filter(x => x.t > 0);
@@ -2087,13 +2096,13 @@ function tutorialTry() {
     tutSavedState = {
         score, obstacles, items, particles, gameOver,
         spawnTimer, currentRequiredInterval, slowMotionTimer, hasShield, shieldTimer,
-        clearTimer, starPowerTimer, wideGapTimer, itemCooldownBalken,
+        clearCharges, starPowerTimer, wideGapTimer, itemCooldownBalken,
         lastPattern, lastColorStr, colorStreakCount, perfectStreak
     };
     tutorialTestActive = true;
     obstacles = []; items = []; particles = [];
     gameOver = false;
-    slowMotionTimer = 0; hasShield = false; shieldTimer = 0; clearTimer = 0;
+    slowMotionTimer = 0; hasShield = false; shieldTimer = 0; clearCharges = 0;
     starPowerTimer = 0; wideGapTimer = 0; itemCooldownBalken = 0;
     lastPattern = -1; lastColorStr = ''; colorStreakCount = 0; perfectStreak = 0;
     currentRequiredInterval = FIXED_INTERVAL;
@@ -2125,7 +2134,7 @@ function tutorialRestoreState() {
     slowMotionTimer = tutSavedState.slowMotionTimer;
     hasShield = tutSavedState.hasShield;
     shieldTimer = tutSavedState.shieldTimer;
-    clearTimer = tutSavedState.clearTimer;
+    clearCharges = tutSavedState.clearCharges;
     starPowerTimer = tutSavedState.starPowerTimer;
     wideGapTimer = tutSavedState.wideGapTimer;
     itemCooldownBalken = tutSavedState.itemCooldownBalken;
