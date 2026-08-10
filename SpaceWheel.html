@@ -1702,24 +1702,24 @@ let musicEnabled = localStorage.getItem('sw_music') !== 'off';
 let sfxEnabled = localStorage.getItem('sw_sfx') !== 'off';
 let musicDelay = null, musicDelayGain = null, noiseBuf = null;
 let musicTimer = null, eighthCount = 0, nextEighthTime = 0;
-const MUSIC_BPM = 132;
+const MUSIC_BPM = 150;
 const MUSIC_TRANSPOSE = 0; // Halbtöne; 0 = A-Moll, -2 = G-Moll
 const STEP16 = 60 / MUSIC_BPM / 4;
 const EIGHTH = STEP16 * 2;
-// VERSION 11 (Experiment) — Ruhiger Bogen: C – Am – Dm – G, 132 BPM
-// Getragene Melodie aus langen Tönen (Halbe/Viertel), absteigend eröffnet,
-// mit gehaltenem Zielton pro Phrase. Terzen-Zweitstimme bleibt.
+// VERSION 2 (wiederhergestellt aus dem Archiv) — hymnische Folge: Em – C – G – D
+// Riff: Zielton → schneller Doppelschlag → gehaltener Schlusston; das
+// gehaltene F#5 am Loop-Ende zieht stufenweise zurück zum E5 des Anfangs.
 const MUSIC_CHORDS = [
+    { bass: 40, arpRoot: 52, minor: true,
+      melody: { 0:[76,3], 4:[79,1], 6:[78,1], 8:[76,4], 14:[74,2], 16:[76,3], 22:[71,8] } },
     { bass: 48, arpRoot: 60, minor: false,
-      melody: { 0:[79,6,76], 8:[76,4,72], 12:[74,2,71], 16:[72,8,69], 26:[74,4,71] } },
-    { bass: 45, arpRoot: 57, minor: true,
-      melody: { 0:[76,6,72], 8:[72,4,69], 12:[71,2,67], 16:[69,8,65], 26:[71,4,67] } },
-    { bass: 50, arpRoot: 62, minor: true,
-      melody: { 0:[74,6,71], 8:[77,4,74], 12:[76,2,72], 16:[74,8,71], 26:[72,4,69] } },
+      melody: { 0:[72,3], 4:[76,1], 6:[74,1], 8:[72,4], 14:[71,2], 16:[72,3], 22:[76,8] } },
     { bass: 43, arpRoot: 55, minor: false,
-      melody: { 0:[71,6,67], 8:[74,4,71], 12:[76,2,72], 16:[79,6,76], 24:[76,4,72], 28:[74,4,71] } }
+      melody: { 0:[74,3], 4:[79,1], 6:[78,1], 8:[74,4], 14:[71,2], 16:[74,3], 22:[79,8] } },
+    { bass: 50, arpRoot: 62, minor: false,
+      melody: { 0:[74,3], 4:[78,1], 6:[76,1], 8:[74,4], 14:[71,2], 16:[69,3], 22:[78,8] } }
 ];
-const ARP_SEQ = [0, 1, 2, 3, 3, 2, 1, 0, 0, 1, 2, 3, 3, 2, 1, 0];
+const ARP_SEQ = [0, 1, 2, 3, 0, 1, 2, 3, 0, 2, 1, 3, 0, 1, 3, 2];
 
 function midiFreq(m) { return 440 * Math.pow(2, (m + MUSIC_TRANSPOSE - 69) / 12); }
 
@@ -1811,18 +1811,18 @@ function playStep(step, t) {
 }
 
 function leadVoice(freq, t, dur, vol) {
-    // Rechteckwelle für Chiptune-Charakter; vol < 1 für die Terzstimme
-    const peak = 0.045 * (vol || 1);
-    [-6, 6].forEach(det => {
+    // V2-Lead: weicher Sägezahn; vol < 1 für optionale Zweitstimme
+    const peak = 0.06 * (vol || 1);
+    [-8, 8].forEach(det => {
         const o = audioCtx.createOscillator();
-        o.type = 'square'; o.frequency.value = freq; o.detune.value = det;
+        o.type = 'sawtooth'; o.frequency.value = freq; o.detune.value = det;
         const f = audioCtx.createBiquadFilter();
-        f.type = 'lowpass'; f.frequency.value = 3000; f.Q.value = 1;
+        f.type = 'lowpass'; f.frequency.value = 2600; f.Q.value = 1.5;
         const g = audioCtx.createGain();
         g.gain.setValueAtTime(0, t);
-        g.gain.linearRampToValueAtTime(peak, t + 0.01);
+        g.gain.linearRampToValueAtTime(peak, t + 0.02);
         g.gain.setValueAtTime(peak, t + dur);
-        g.gain.exponentialRampToValueAtTime(0.001, t + dur + 0.05);
+        g.gain.exponentialRampToValueAtTime(0.001, t + dur + 0.1);
         o.connect(f); f.connect(g); g.connect(musicMaster); g.connect(musicDelay);
         o.start(t); o.stop(t + dur + 0.15);
     });
