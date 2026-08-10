@@ -1,4 +1,4 @@
-const CACHE = 'orbit-sync-v27';
+const CACHE = 'orbit-sync-v28';
 const STATIC_ASSETS = [
     './manifest.json',
     './icon-192.png',
@@ -23,10 +23,12 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
     const url = new URL(e.request.url);
 
-    // Network-first für die Haupt-HTML: immer frische Version laden
+    // Network-first für die Haupt-HTML: immer frische Version laden.
+    // cache: 'no-cache' erzwingt Revalidierung am Server und umgeht den
+    // HTTP-Cache des Browsers (GitHub Pages sendet max-age=600)
     if (url.pathname.endsWith('SpaceWheel.html') || url.pathname.endsWith('/SpaceWheel/')) {
         e.respondWith(
-            fetch(e.request)
+            fetch(e.request, { cache: 'no-cache' })
                 .then(response => {
                     caches.open(CACHE).then(c => c.put(e.request, response.clone()));
                     return response;
