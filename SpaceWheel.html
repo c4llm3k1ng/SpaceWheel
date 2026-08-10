@@ -264,7 +264,7 @@
     <div id="hamburger-menu">
         <div class="ham-card">
             <div class="ham-title">Space Wheel</div>
-            <button class="ham-item" onclick="closeHamburger()">
+            <button class="ham-item" onclick="startPlayFromMenu()">
                 <span class="ham-icon">▶</span> Spielen
             </button>
             <button class="ham-item" onclick="closeHamburger(); openLeaderboard()">
@@ -1729,11 +1729,17 @@ function closeHelp() {
 }
 
 // ── Tutorial-Frage beim ersten Spielen auf einem Account ────
-function maybeAskTutorial() {
+function startPlayFromMenu() {
     const asked = (fbUser && fbUserData)
         ? fbUserData.tutorialAsked
         : localStorage.getItem('sw_tutorial_asked') === 'yes';
-    if (asked) return;
+    if (!asked) {
+        maybeAskTutorial();
+        return;
+    }
+    closeHamburger();
+}
+function maybeAskTutorial() {
     markTutorialAsked();
     document.getElementById('ask-icon').textContent = '📖';
     document.getElementById('ask-title').textContent = 'Tutorial spielen?';
@@ -1764,7 +1770,9 @@ function tutorialAskNo() {
         '<button class="tut-next" onclick="tutorialAskClose()">OK</button>';
 }
 function tutorialAskClose() {
+    // Nach "Nein" + "OK": das Spiel starten — dafür wurde ja "Spielen" gedrückt
     document.getElementById('tutorial-ask').classList.remove('active');
+    closeHamburger();
 }
 
 // ── Einstellungen ───────────────────────────────────────────
@@ -2363,7 +2371,6 @@ function startAsGuest() {
     isGuest = true;
     showScreen(null);
     openHamburger();
-    maybeAskTutorial();
 }
 
 async function openLeaderboard() {
@@ -2561,7 +2568,6 @@ fbAuth.onAuthStateChanged(async (user) => {
         await loadUserData(user.uid);
         showScreen(null);
         openHamburger();
-        maybeAskTutorial();
     } else {
         fbUser = null;
         fbUserData = null;
