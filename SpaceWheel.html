@@ -338,7 +338,7 @@
             </div>
             <div class="help-item">
                 <div class="help-icon">⬛⬛⬛</div>
-                <div><div class="help-name">Triple</div><div class="help-desc">Drei Balken gleichzeitig – noch enger, aber gleiches Prinzip.</div></div>
+                <div><div class="help-name">Triple</div><div class="help-desc">Drei Lücken gleichzeitig: Cyan links, Gelb Mitte, Pink rechts. ALLE drei Farben müssen durch ihre jeweilige Lücke!</div></div>
             </div>
             <div class="help-item">
                 <div class="help-icon">🦓</div>
@@ -448,6 +448,7 @@ let tutorialTestActive = false;
 let tutorialNoSpawn = false;
 let tutorialItemBoost = false;
 let tutorialForceType = null;
+let tutorialForceItem = null;
 let tutorialFirstColor = null;
 let tutSavedState = null;
 
@@ -728,8 +729,8 @@ function update() {
             let bY = obs.y + obs.height / 2;
             inZone = bY >= orbitY - orbitRadius - sphereRadius - 13 && bY <= orbitY + orbitRadius + sphereRadius + 13;
         } else if (obs.type === TYPE_TRIPLE_GAP) {
-            // Schmale Zone: TRIPLE_GAP prüft nur X-Positionen am orbitY-Niveau
-            inZone = (obs.y + obs.height >= orbitY - sphereRadius && obs.y <= orbitY + sphereRadius);
+            // Breite Zone: deckt alle Kugel-Y-Positionen ab (per-Farbe-Check innen)
+            inZone = (obs.y + obs.height >= orbitY - orbitRadius - sphereRadius && obs.y <= orbitY + orbitRadius + sphereRadius);
         } else {
             // Breite Zone: deckt alle möglichen Kugel-Y-Positionen ab (mit per-Kugel-Check innen)
             inZone = (obs.y + obs.height >= orbitY - orbitRadius - sphereRadius && obs.y <= orbitY + orbitRadius + sphereRadius);
@@ -802,30 +803,33 @@ function update() {
             } else if (obs.type === TYPE_TRIPLE_GAP) {
                 if (wideGapTimer > 0) { success = true; }
                 else {
-                // Alle aktiven Kugeln gegen alle drei Lücken prüfen. Mit 4 Kugeln
-                // gibt es ZWEI gültige Ausrichtungen (Pink/Cyan außen ODER Gelb/Lila
-                // außen) — die alte Logik kannte nur die erste und gab sonst
-                // fälschlich Game Over.
-                let tripleBalls = [pX, cX, yX];
-                if (score >= 125) tripleBalls.push(bX);
-                const tripleGaps = [
+                // ALLE drei angezeigten Farben müssen durch ihre jeweilige Lücke:
+                // color[0] (Cyan) → links, color[1] (Gelb) → Mitte, color[2] (Pink) → rechts.
+                // Zustand pro Farbe merken, da die Kugeln den Balken zu
+                // unterschiedlichen Zeitpunkten erreichen (wie beim Dual-Balken).
+                if (!obs._tChecked) { obs._tChecked = []; obs._tPassed = []; }
+                const tGaps = [
                     [obs.gapX, obs.gapWidth],
                     [obs.gapX2, obs.gapWidth2],
                     [obs.gapX3, obs.gapWidth3]
                 ];
-                let tripleAnySuccess = false;
-                for (let ballX of tripleBalls) {
-                    for (let g of tripleGaps) {
-                        if (ballX - sphereRadius + 1 >= g[0] && ballX + sphereRadius - 1 <= g[0] + g[1]) {
-                            tripleAnySuccess = true;
-                            closestDist = Math.min(closestDist, getDistanceToGapEdges(ballX, g[0], g[1]));
-                        }
+                for (let ti = 0; ti < 3; ti++) {
+                    const coord = getTargetCoordinates(obs.color[ti], pX, pY, cX, cY, yX, yY, bX, bY);
+                    const barAtY = (obs.y + obs.height >= coord.y - sphereRadius && obs.y <= coord.y + sphereRadius);
+                    if (!barAtY) continue;
+                    obs._tChecked[ti] = true;
+                    if (coord.x - sphereRadius + 1 >= tGaps[ti][0] && coord.x + sphereRadius - 1 <= tGaps[ti][0] + tGaps[ti][1]) {
+                        obs._tPassed[ti] = true;
+                        closestDist = Math.min(closestDist, getDistanceToGapEdges(coord.x, tGaps[ti][0], tGaps[ti][1]));
                     }
                 }
 
-                if (tripleAnySuccess) {
+                const tripleSuccess = obs._tPassed[0] && obs._tPassed[1] && obs._tPassed[2];
+                const tripleFail = [0, 1, 2].some(ti => obs._tChecked[ti] && !obs._tPassed[ti]);
+
+                if (tripleSuccess) {
                     success = true;
-                } else {
+                } else if (tripleFail) {
                     if (hasShield) {
                         hasShield = false;
                         obs.passed = true;
@@ -1075,6 +1079,24 @@ function createObstacle() {
             gapX = orbitX + (Math.random() * 80 - 40);
             currentRequiredInterval = FIXED_INTERVAL + 300;
         }
+        // Auch im erzwungenen Modus Items liefern, wenn der Test das verlangt
+        if (tutorialItemBoost) {
+            if (itemCooldownBalken > 0) {
+                itemCooldownBalken--;
+            } else {
+                let tPool = [COLOR_PINK];
+                if (score >= 12) tPool.push(COLOR_CYAN);
+                if (score >= 51) tPool.push(COLOR_YELLOW);
+                if (score >= 125) tPool.push(COLOR_PURPLE);
+                items.push({
+                    x: orbitX + (Math.random() * 120 - 60), y: -400,
+                    color: tPool[Math.floor(Math.random() * tPool.length)],
+                    effect: tutorialForceItem || ITEM_SLOW,
+                    rotation: Math.random() * Math.PI, size: 24
+                });
+                itemCooldownBalken = 1;
+            }
+        }
         obstacles.push({
             y: -120, gapX: gapX, gapWidth: gapWidth, height: 35,
             color: obstacleColor, passed: false, type: obstacleType,
@@ -1191,6 +1213,7 @@ function createObstacle() {
         else if (rarityRoll < 0.45) itemEffect = ITEM_WIDEGAP;
         else if (rarityRoll < 0.70) itemEffect = ITEM_CLEAR;
         else itemEffect = ITEM_SLOW;
+        if (tutorialForceItem) itemEffect = tutorialForceItem;
 
         items.push({
             x: itemX, 
@@ -2000,8 +2023,10 @@ const TUTORIAL_SLIDES = [
       test: { score: 27, force: 'ZEBRA' } },
     { icon: '💣', title: 'Bomben', text: 'Statt eines Balkens fällt eine Bombe. Weiche ihr mit allen Kugeln aus – eine Berührung bedeutet Game Over (außer du hast ein Schild).',
       test: { score: 12, force: 'BOMB' } },
-    { icon: '✨', title: 'Items', text: '🌟 Star Immunity · ⏳ Zeitlupe\n🛡️ Schild · 💥 Sprengung · ↔ Breite Lücken\n🔀 Farbtausch (ab Score 155): gegenüberliegende Kugeln tauschen die Plätze!\n\nFliege durch sie hindurch um sie zu aktivieren.',
+    { icon: '✨', title: 'Items', text: '🌟 Star Immunity · ⏳ Zeitlupe\n🛡️ Schild · 💥 Sprengung · ↔ Breite Lücken\n\nFliege durch sie hindurch um sie zu aktivieren.',
       test: { score: 10, itemBoost: true } },
+    { icon: '🔀', title: 'Farbtausch', text: 'Ab Score 155: Beim Einsammeln tauschen gegenüberliegende Kugeln sofort die Plätze – Pink ⇄ Cyan und Gelb ⇄ Lila. Schnell umdenken!',
+      test: { score: 155, force: 'SINGLE', itemBoost: true, forceItem: 'SWAP' } },
     { icon: '🚀', title: 'Los geht\'s!', text: 'Erreiche hohe Scores und schlage deine Freunde in der Bestenliste.\n\nViel Erfolg!',
       test: null }
 ];
@@ -2064,6 +2089,7 @@ function tutorialTry() {
     tutorialNoSpawn = !!cfg.noSpawn;
     tutorialItemBoost = !!cfg.itemBoost;
     tutorialForceType = cfg.force || null;
+    tutorialForceItem = cfg.forceItem || null;
     tutorialFirstColor = cfg.firstColor || null;
     scoreEl.innerText = score;
     document.getElementById('score-line').style.display = cfg.showScore ? '' : 'none';
@@ -2099,6 +2125,7 @@ function tutorialRestoreState() {
     tutorialNoSpawn = false;
     tutorialItemBoost = false;
     tutorialForceType = null;
+    tutorialForceItem = null;
     tutorialFirstColor = null;
 }
 function tutorialExitToMenu() {
