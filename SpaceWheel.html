@@ -1633,18 +1633,19 @@ const MUSIC_BPM = 150;
 const MUSIC_TRANSPOSE = 0; // Halbtöne; 0 = A-Moll, -2 = G-Moll
 const STEP16 = 60 / MUSIC_BPM / 4;
 const EIGHTH = STEP16 * 2;
-// VERSION 4 (Experiment) — Funky Chiptune-Riff: Am – Am – F – G
-// Frage-Antwort-Hook in A-Moll-Pentatonik mit Synkopen und Oktav-Stinger.
-// Stil an Crazy-Frog-/Tetris-Energie angelehnt — eigene Komposition.
+// VERSION 5 (Experiment) — Perpetuum mobile: Am – F – Dm – E
+// Durchlaufende Achtelbewegung ohne Pausen (der "Puzzle-Spiel-Motor"),
+// Bogen: Arpeggio hoch → Zickzack runter, Kadenz mit Lauf und Hängeton.
+// Stil an Tetris-/Crazy-Frog-Energie angelehnt — eigene Komposition.
 const MUSIC_CHORDS = [
-    { bass: 45, arpRoot: 57, minor: true,   // Frage: endet oben auf E5
-      melody: { 0:[69,2], 4:[69,1], 6:[72,1], 8:[69,1], 10:[74,2], 14:[72,1], 16:[69,2], 20:[67,1], 22:[69,1], 24:[76,3], 30:[74,1] } },
-    { bass: 45, arpRoot: 57, minor: true,   // Antwort: gleiche Frage, landet unten
-      melody: { 0:[69,2], 4:[69,1], 6:[72,1], 8:[69,1], 10:[74,2], 14:[72,1], 16:[79,2], 20:[76,1], 22:[74,1], 24:[72,2], 28:[69,2] } },
+    { bass: 45, arpRoot: 57, minor: true,
+      melody: { 0:[69,2], 2:[72,2], 4:[76,2], 6:[81,2], 8:[79,2], 10:[76,2], 12:[77,2], 14:[74,2], 16:[76,2], 18:[72,2], 20:[74,2], 22:[71,2], 24:[72,2], 26:[69,2], 28:[71,2], 30:[67,2] } },
     { bass: 41, arpRoot: 53, minor: false,
-      melody: { 0:[72,2], 4:[72,1], 6:[77,1], 8:[76,1], 10:[74,2], 14:[72,1], 16:[74,2], 20:[76,1], 22:[77,1], 24:[76,2], 28:[74,2] } },
-    { bass: 43, arpRoot: 55, minor: false,  // Aufwärtslauf, hängt auf B4 → zieht zu A
-      melody: { 0:[74,2], 4:[74,1], 6:[79,1], 8:[76,1], 10:[74,2], 14:[71,1], 16:[72,1], 18:[74,1], 20:[76,1], 22:[77,1], 24:[79,2], 28:[71,2] } }
+      melody: { 0:[69,2], 2:[72,2], 4:[77,2], 6:[81,2], 8:[79,2], 10:[77,2], 12:[76,2], 14:[72,2], 16:[74,2], 18:[77,2], 20:[76,2], 22:[72,2], 24:[74,2], 26:[71,2], 28:[72,2], 30:[69,2] } },
+    { bass: 50, arpRoot: 62, minor: true,
+      melody: { 0:[74,2], 2:[77,2], 4:[81,2], 6:[79,2], 8:[77,2], 10:[74,2], 12:[76,2], 14:[72,2], 16:[74,2], 18:[71,2], 20:[72,2], 22:[74,2], 24:[76,2], 26:[77,2], 28:[76,2], 30:[74,2] } },
+    { bass: 40, arpRoot: 52, minor: false,  // Kadenz: Halteton, Lauf, B-Hängeton → zieht zu A
+      melody: { 0:[71,4], 6:[68,2], 8:[76,4], 14:[74,2], 16:[72,2], 20:[71,2], 24:[69,2], 26:[68,2], 28:[71,4] } }
 ];
 const ARP_SEQ = [0, 3, 1, 3, 2, 3, 1, 3, 0, 3, 1, 3, 2, 3, 1, 3];
 
