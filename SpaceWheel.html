@@ -1701,18 +1701,18 @@ const MUSIC_BPM = 150;
 const MUSIC_TRANSPOSE = 0; // Halbtöne; 0 = A-Moll, -2 = G-Moll
 const STEP16 = 60 / MUSIC_BPM / 4;
 const EIGHTH = STEP16 * 2;
-// VERSION 6 (Experiment) — Galopp-Hook: Em – G – D – Am
-// Punktierter Galopp-Rhythmus (DAM-da-DAAM ×2) als Markenzeichen, dann
-// laufende Antwort und langer Zielton. Eigene Komposition, Chiptune-Lead.
+// VERSION 7 (Experiment) — Synkopen-Hook: Em – G – D – Am
+// Synkopierter Auftakt (Pickup neben dem Beat), steigende Antwort,
+// Höhepunkt-Phrase auf D, Schluss auf dem Leitton B → zieht zurück zu E.
 const MUSIC_CHORDS = [
     { bass: 40, arpRoot: 52, minor: true,
-      melody: { 0:[76,3], 3:[74,1], 4:[76,4], 8:[79,3], 11:[76,1], 12:[79,4], 16:[81,2], 18:[79,2], 20:[78,2], 22:[76,2], 24:[74,8] } },
+      melody: { 0:[76,2], 3:[79,1], 4:[76,2], 6:[74,2], 8:[71,4], 12:[74,2], 14:[76,2], 16:[79,4], 20:[81,2], 22:[79,2], 24:[76,2], 26:[74,6] } },
     { bass: 43, arpRoot: 55, minor: false,
-      melody: { 0:[74,3], 3:[71,1], 4:[74,4], 8:[79,3], 11:[74,1], 12:[79,4], 16:[81,2], 18:[79,2], 20:[78,2], 22:[74,2], 24:[71,8] } },
+      melody: { 0:[74,2], 3:[79,1], 4:[74,2], 6:[71,2], 8:[67,4], 12:[71,2], 14:[74,2], 16:[79,4], 20:[81,2], 22:[79,2], 24:[74,2], 26:[71,6] } },
     { bass: 50, arpRoot: 62, minor: false,
-      melody: { 0:[74,3], 3:[71,1], 4:[74,4], 8:[78,3], 11:[74,1], 12:[78,4], 16:[79,2], 18:[78,2], 20:[76,2], 22:[74,2], 24:[76,8] } },
+      melody: { 0:[78,2], 3:[81,1], 4:[78,2], 6:[76,2], 8:[74,4], 12:[76,2], 14:[78,2], 16:[81,4], 20:[83,2], 22:[81,2], 24:[78,2], 26:[76,6] } },
     { bass: 45, arpRoot: 57, minor: true,
-      melody: { 0:[72,3], 3:[69,1], 4:[72,4], 8:[76,3], 11:[72,1], 12:[76,4], 16:[74,2], 18:[76,2], 20:[74,2], 22:[71,2], 24:[74,8] } }
+      melody: { 0:[76,2], 3:[81,1], 4:[76,2], 6:[72,2], 8:[69,4], 12:[71,2], 14:[72,2], 16:[74,4], 20:[72,2], 22:[71,2], 24:[69,2], 26:[71,6] } }
 ];
 const ARP_SEQ = [0, 1, 2, 3, 3, 2, 1, 0, 0, 1, 2, 3, 3, 2, 1, 0];
 
