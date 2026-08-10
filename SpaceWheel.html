@@ -972,17 +972,9 @@ function activateItem(effect) {
         // Gegenüberliegende Farben tauschen die Plätze (= 180°-Sprung des Rads)
         orbitAngle += Math.PI;
         targetOrbitAngle += Math.PI;
-        // Reaktionszeit: den nächsten zu passierenden Balken (noch nicht an
-        // der Kollisionszone) um 0,5 s Fallstrecke nach oben schieben
-        let swapSpeed = getLevelSettings(score).speed;
-        if (tutorialTestActive) swapSpeed = Math.min(swapSpeed, 330);
-        let nextBar = null;
-        for (let o of obstacles) {
-            if (!o.passed && o.y + o.height < orbitY - orbitRadius - sphereRadius) {
-                if (!nextBar || o.y > nextBar.y) nextBar = o;
-            }
-        }
-        if (nextBar) nextBar.y -= swapSpeed * 0.5;
+        // Reaktionszeit ist bereits eingeplant: beim Spawn eines Farbtausch-
+        // Items bekommt der folgende Balken automatisch 0,5 s mehr Abstand
+        // (siehe createObstacle)
         createFloatingText("🔀 FARBTAUSCH!", orbitX, orbitY - 50);
         [COLOR_PINK, COLOR_CYAN, COLOR_YELLOW, COLOR_PURPLE].forEach(c => triggerJuiceEffect(c));
     } else if (effect === ITEM_WIDEGAP) {
@@ -1116,6 +1108,8 @@ function createObstacle() {
                     rotation: Math.random() * Math.PI, size: 24
                 });
                 itemCooldownBalken = 1;
+                // Kommt ein Farbtausch: dem nächsten Balken 0,5 s mehr Abstand geben
+                if (tutorialForceItem === ITEM_SWAP) currentRequiredInterval += 500;
             }
         }
         obstacles.push({
@@ -1247,6 +1241,8 @@ function createObstacle() {
         else if (rarityRoll < 0.70) itemEffect = ITEM_CLEAR;
         else itemEffect = ITEM_SLOW;
         if (tutorialForceItem) itemEffect = tutorialForceItem;
+        // Kommt ein Farbtausch: dem nächsten Balken 0,5 s mehr Abstand geben
+        if (itemEffect === ITEM_SWAP) currentRequiredInterval += 500;
 
         items.push({
             x: itemX, 
