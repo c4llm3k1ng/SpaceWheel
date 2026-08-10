@@ -1702,23 +1702,22 @@ let musicEnabled = localStorage.getItem('sw_music') !== 'off';
 let sfxEnabled = localStorage.getItem('sw_sfx') !== 'off';
 let musicDelay = null, musicDelayGain = null, noiseBuf = null;
 let musicTimer = null, eighthCount = 0, nextEighthTime = 0;
-const MUSIC_BPM = 150;
+const MUSIC_BPM = 132;
 const MUSIC_TRANSPOSE = 0; // Halbtöne; 0 = A-Moll, -2 = G-Moll
 const STEP16 = 60 / MUSIC_BPM / 4;
 const EIGHTH = STEP16 * 2;
-// VERSION 10 (Experiment) — Jump'n'Run: C – Am – Dm – G (Kreisfolge)
-// Plattformer-Zutaten: Dur, hüpfende Staccato-Sprünge über Dreiklänge,
-// Synkopen (Noten auf Step 3 statt 4), chromatische Rutscher (D#→E, F#→G)
-// und Terzen-Zweitstimme. Eigene Komposition.
+// VERSION 11 (Experiment) — Ruhiger Bogen: C – Am – Dm – G, 132 BPM
+// Getragene Melodie aus langen Tönen (Halbe/Viertel), absteigend eröffnet,
+// mit gehaltenem Zielton pro Phrase. Terzen-Zweitstimme bleibt.
 const MUSIC_CHORDS = [
     { bass: 48, arpRoot: 60, minor: false,
-      melody: { 0:[72,1,69], 3:[74,1,71], 4:[76,1,72], 6:[79,2,76], 10:[76,1,72], 12:[74,1,71], 14:[72,1,69], 16:[69,1,65], 19:[75,1], 20:[76,1,72], 22:[81,2,77], 26:[79,1,76], 28:[76,1,72] } },
+      melody: { 0:[79,6,76], 8:[76,4,72], 12:[74,2,71], 16:[72,8,69], 26:[74,4,71] } },
     { bass: 45, arpRoot: 57, minor: true,
-      melody: { 0:[69,1,65], 3:[72,1,69], 4:[76,1,72], 6:[81,2,77], 10:[76,1,72], 12:[72,1,69], 14:[76,1,72], 16:[74,2,71], 20:[72,1,69], 22:[71,1,67], 24:[69,2,65], 28:[67,1,64] } },
+      melody: { 0:[76,6,72], 8:[72,4,69], 12:[71,2,67], 16:[69,8,65], 26:[71,4,67] } },
     { bass: 50, arpRoot: 62, minor: true,
-      melody: { 0:[74,1,71], 3:[77,1,74], 4:[74,1,71], 6:[81,2,77], 10:[77,1,74], 12:[74,1,71], 14:[77,1,74], 16:[79,2,76], 20:[77,1,74], 22:[76,1,72], 24:[74,2,71], 28:[71,1,67] } },
+      melody: { 0:[74,6,71], 8:[77,4,74], 12:[76,2,72], 16:[74,8,71], 26:[72,4,69] } },
     { bass: 43, arpRoot: 55, minor: false,
-      melody: { 0:[71,1,67], 3:[74,1,71], 4:[79,1,76], 6:[83,2,79], 10:[79,1,76], 12:[74,1,71], 14:[71,1,67], 16:[72,1,69], 18:[74,1,71], 20:[76,1,72], 22:[78,1], 24:[79,4,76] } }
+      melody: { 0:[71,6,67], 8:[74,4,71], 12:[76,2,72], 16:[79,6,76], 24:[76,4,72], 28:[74,4,71] } }
 ];
 const ARP_SEQ = [0, 1, 2, 3, 3, 2, 1, 0, 0, 1, 2, 3, 3, 2, 1, 0];
 
