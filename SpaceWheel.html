@@ -158,6 +158,21 @@
             width: 38px; height: 38px; border-radius: 50%;
             font-size: 20px; cursor: pointer;
         }
+        #tutorial-ask {
+            display: none; position: fixed; inset: 0; z-index: 400;
+            background: rgba(10,10,15,0.85);
+            align-items: center; justify-content: center;
+        }
+        #tutorial-ask.active { display: flex; }
+        .ask-card {
+            background: #13141a; border: 1px solid #2a2b3d; border-radius: 18px;
+            padding: 26px 22px 20px; max-width: 320px; margin: 0 16px; text-align: center;
+        }
+        .ask-buttons { display: flex; gap: 10px; justify-content: center; margin-top: 6px; }
+        .ask-secondary {
+            background: #1e1f2e; border: 1px solid #2a2b3d; border-radius: 10px;
+            color: #999; font-size: 15px; padding: 10px 20px; cursor: pointer;
+        }
         #tut-resume-btn {
             display: none; position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
             z-index: 250; background: #13141a; border: 1px solid #00f2fe; color: #00f2fe;
@@ -286,6 +301,19 @@
         </div>
     </div>
     <button id="tut-resume-btn" onclick="tutorialResume()">📖 Weiter im Tutorial</button>
+
+    <!-- Tutorial-Frage beim ersten Spielen -->
+    <div id="tutorial-ask">
+        <div class="ask-card">
+            <div class="tut-icon" id="ask-icon">📖</div>
+            <div class="tut-title" id="ask-title">Tutorial spielen?</div>
+            <div class="tut-text" id="ask-text">Willkommen bei Space Wheel! Möchtest du zuerst das Tutorial ansehen? Es erklärt dir Steuerung, Balken und Items Schritt für Schritt.</div>
+            <div class="ask-buttons" id="ask-buttons">
+                <button class="ask-secondary" onclick="tutorialAskNo()">Nein, danke</button>
+                <button class="tut-next" onclick="tutorialAskYes()">Ja, gerne!</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Help Screen -->
     <div id="help-screen">
@@ -1700,6 +1728,45 @@ function closeHelp() {
     openHamburger();
 }
 
+// ── Tutorial-Frage beim ersten Spielen auf einem Account ────
+function maybeAskTutorial() {
+    const asked = (fbUser && fbUserData)
+        ? fbUserData.tutorialAsked
+        : localStorage.getItem('sw_tutorial_asked') === 'yes';
+    if (asked) return;
+    markTutorialAsked();
+    document.getElementById('ask-icon').textContent = '📖';
+    document.getElementById('ask-title').textContent = 'Tutorial spielen?';
+    document.getElementById('ask-text').textContent = 'Willkommen bei Space Wheel! Möchtest du zuerst das Tutorial ansehen? Es erklärt dir Steuerung, Balken und Items Schritt für Schritt.';
+    document.getElementById('ask-buttons').innerHTML =
+        '<button class="ask-secondary" onclick="tutorialAskNo()">Nein, danke</button>' +
+        '<button class="tut-next" onclick="tutorialAskYes()">Ja, gerne!</button>';
+    document.getElementById('tutorial-ask').classList.add('active');
+}
+function markTutorialAsked() {
+    if (fbUser) {
+        if (fbUserData) fbUserData.tutorialAsked = true;
+        fbDb.collection('users').doc(fbUser.uid).update({ tutorialAsked: true }).catch(() => {});
+    } else {
+        localStorage.setItem('sw_tutorial_asked', 'yes');
+    }
+}
+function tutorialAskYes() {
+    document.getElementById('tutorial-ask').classList.remove('active');
+    closeHamburger();
+    startTutorial();
+}
+function tutorialAskNo() {
+    document.getElementById('ask-icon').textContent = '👍';
+    document.getElementById('ask-title').textContent = 'Alles klar!';
+    document.getElementById('ask-text').textContent = 'Du kannst dir das Tutorial jederzeit im Menü unter „📖 Tutorial" noch einmal anschauen und spielen.';
+    document.getElementById('ask-buttons').innerHTML =
+        '<button class="tut-next" onclick="tutorialAskClose()">OK</button>';
+}
+function tutorialAskClose() {
+    document.getElementById('tutorial-ask').classList.remove('active');
+}
+
 // ── Einstellungen ───────────────────────────────────────────
 function openSettings() {
     document.getElementById('settings-screen').classList.add('active');
@@ -2295,6 +2362,8 @@ async function updateFirebaseHighscore(newScore) {
 function startAsGuest() {
     isGuest = true;
     showScreen(null);
+    openHamburger();
+    maybeAskTutorial();
 }
 
 async function openLeaderboard() {
@@ -2491,6 +2560,8 @@ fbAuth.onAuthStateChanged(async (user) => {
         fbUser = user;
         await loadUserData(user.uid);
         showScreen(null);
+        openHamburger();
+        maybeAskTutorial();
     } else {
         fbUser = null;
         fbUserData = null;
