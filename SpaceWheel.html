@@ -1701,18 +1701,19 @@ const MUSIC_BPM = 150;
 const MUSIC_TRANSPOSE = 0; // Halbtöne; 0 = A-Moll, -2 = G-Moll
 const STEP16 = 60 / MUSIC_BPM / 4;
 const EIGHTH = STEP16 * 2;
-// VERSION 8 (Experiment) — Harmonisch: C – G – Am – F ("die vier Akkorde")
-// Sangliche Melodie mit ZWEITER STIMME in Terzen darunter (melody-Einträge:
-// [Note, Länge, Terzstimme]) — parallele Terzen = warmer, harmonischer Klang.
+// VERSION 9 (Experiment) — V2-Akkorde + Tetris-Feeling: Em – C – G – D
+// Volkstanz-DNA: Viertel + zwei Achtel als Tanzrhythmus, stufenweise Läufe
+// in Moll, Motiv-Sequenzen. Aufsteigende Eröffnung (bewusst anders als
+// Korobeiniki). Terzstimme darunter für den harmonischen Klang von V8.
 const MUSIC_CHORDS = [
+    { bass: 40, arpRoot: 52, minor: true,
+      melody: { 0:[64,4,60], 4:[67,2,64], 6:[69,2,66], 8:[71,4,67], 12:[74,2,71], 14:[71,2,67], 16:[72,4,69], 20:[71,2,67], 22:[69,2,66], 24:[67,4,64], 28:[71,2,67], 30:[67,2,64] } },
     { bass: 48, arpRoot: 60, minor: false,
-      melody: { 0:[76,4,72], 6:[74,2,71], 8:[76,2,72], 10:[79,2,76], 12:[76,4,72], 16:[72,4,69], 22:[74,2,71], 24:[76,2,72], 26:[74,6,71] } },
+      melody: { 0:[72,4,69], 4:[74,2,71], 6:[76,2,72], 8:[79,4,76], 12:[76,2,72], 14:[74,2,71], 16:[72,4,69], 20:[74,2,71], 22:[76,2,72], 24:[74,4,71], 28:[72,2,69], 30:[71,2,67] } },
     { bass: 43, arpRoot: 55, minor: false,
-      melody: { 0:[74,4,71], 6:[71,2,67], 8:[74,2,71], 10:[79,2,76], 12:[74,4,71], 16:[71,4,67], 22:[72,2,69], 24:[74,2,71], 26:[71,6,67] } },
-    { bass: 45, arpRoot: 57, minor: true,
-      melody: { 0:[72,4,69], 6:[71,2,67], 8:[72,2,69], 10:[76,2,72], 12:[74,4,71], 16:[71,4,67], 22:[69,2,65], 24:[71,2,67], 26:[72,6,69] } },
-    { bass: 41, arpRoot: 53, minor: false,
-      melody: { 0:[72,4,69], 6:[69,2,65], 8:[72,2,69], 10:[77,2,74], 12:[76,4,72], 16:[74,4,71], 22:[72,2,69], 24:[74,2,71], 26:[72,6,69] } }
+      melody: { 0:[74,4,71], 4:[71,2,67], 6:[72,2,69], 8:[74,4,71], 12:[79,2,76], 14:[78,2,74], 16:[79,4,76], 20:[78,2,74], 22:[76,2,72], 24:[74,4,71], 28:[72,2,69], 30:[71,2,67] } },
+    { bass: 50, arpRoot: 62, minor: false,
+      melody: { 0:[69,4,66], 4:[74,2,71], 6:[78,2,74], 8:[81,4,78], 12:[78,2,74], 14:[74,2,71], 16:[76,4,72], 20:[74,2,71], 22:[72,2,69], 24:[71,4,67], 28:[74,2,71], 30:[71,2,67] } }
 ];
 const ARP_SEQ = [0, 1, 2, 3, 3, 2, 1, 0, 0, 1, 2, 3, 3, 2, 1, 0];
 
