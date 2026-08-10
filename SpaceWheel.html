@@ -968,6 +968,8 @@ function activateItem(effect) {
         // Gegenüberliegende Farben tauschen die Plätze (= 180°-Sprung des Rads)
         orbitAngle += Math.PI;
         targetOrbitAngle += Math.PI;
+        // Reaktionszeit: nächster Balken kommt 0,5 s später
+        spawnTimer -= 500;
         createFloatingText("🔀 FARBTAUSCH!", orbitX, orbitY - 50);
         [COLOR_PINK, COLOR_CYAN, COLOR_YELLOW, COLOR_PURPLE].forEach(c => triggerJuiceEffect(c));
     } else if (effect === ITEM_WIDEGAP) {
