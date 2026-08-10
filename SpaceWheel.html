@@ -338,7 +338,7 @@
             </div>
             <div class="help-item">
                 <div class="help-icon">⬛⬛⬛</div>
-                <div><div class="help-name">Triple</div><div class="help-desc">Drei Lücken gleichzeitig: Cyan links, Gelb Mitte, Pink rechts. ALLE drei Farben müssen durch ihre jeweilige Lücke!</div></div>
+                <div><div class="help-name">Triple</div><div class="help-desc">Drei Lücken gleichzeitig. Die farbigen Ränder zeigen, welche Kugel links, in die Mitte und rechts muss – ALLE drei Farben müssen durch!</div></div>
             </div>
             <div class="help-item">
                 <div class="help-icon">🦓</div>
@@ -804,7 +804,7 @@ function update() {
                 if (wideGapTimer > 0) { success = true; }
                 else {
                 // ALLE drei angezeigten Farben müssen durch ihre jeweilige Lücke:
-                // color[0] (Cyan) → links, color[1] (Gelb) → Mitte, color[2] (Pink) → rechts.
+                // color[0] → links, color[1] → Mitte, color[2] → rechts.
                 // Zustand pro Farbe merken, da die Kugeln den Balken zu
                 // unterschiedlichen Zeitpunkten erreichen (wie beim Dual-Balken).
                 if (!obs._tChecked) { obs._tChecked = []; obs._tPassed = []; }
@@ -1136,7 +1136,19 @@ function createObstacle() {
                 if (spawnDual) {
                     if (score >= 60 && Math.random() < 0.30) {
                         obstacleType = TYPE_TRIPLE_GAP;
-                        chosen = [COLOR_CYAN, COLOR_YELLOW, COLOR_PINK];
+                        // Nur lösbare Kombinationen: außen ein GEGENÜBERLIEGENDES
+                        // Paar (Pink–Cyan oder ab 125 Gelb–Lila), in der Mitte eine
+                        // der quer dazu stehenden Kugeln
+                        let sidePair, centerPool;
+                        if (score >= 125 && Math.random() < 0.5) {
+                            sidePair = [COLOR_YELLOW, COLOR_PURPLE];
+                            centerPool = [COLOR_PINK, COLOR_CYAN];
+                        } else {
+                            sidePair = [COLOR_PINK, COLOR_CYAN];
+                            centerPool = (score >= 125) ? [COLOR_YELLOW, COLOR_PURPLE] : [COLOR_YELLOW];
+                        }
+                        if (Math.random() < 0.5) sidePair.reverse();
+                        chosen = [sidePair[0], centerPool[Math.floor(Math.random() * centerPool.length)], sidePair[1]];
                         gapWidth = 58; gapWidth2 = 58; gapWidth3 = 58;
                         gapX = orbitX - orbitRadius - 29;
                         gapX2 = orbitX - 29;
@@ -1452,7 +1464,7 @@ function draw() {
             ctx.lineWidth = 3;
             ctx.strokeStyle = obs.color[0];
             ctx.strokeRect(0, obs.y, obs.gapX, obs.height);
-            ctx.strokeStyle = '#3a3a4a';
+            ctx.strokeStyle = obs.color[1];
             ctx.strokeRect(obs.gapX + obs.gapWidth, obs.y, obs.gapX2 - (obs.gapX + obs.gapWidth), obs.height);
             ctx.strokeRect(obs.gapX2 + obs.gapWidth2, obs.y, obs.gapX3 - (obs.gapX2 + obs.gapWidth2), obs.height);
             ctx.strokeStyle = obs.color[2];
