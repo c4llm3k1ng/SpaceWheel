@@ -372,6 +372,10 @@
                 <div class="help-icon">↔</div>
                 <div><div class="help-name">Breite Lücken (5,2 s)</div><div class="help-desc">Die Lücken aller Balken werden deutlich breiter.</div></div>
             </div>
+            <div class="help-item">
+                <div class="help-icon">🔀</div>
+                <div><div class="help-name">Farbtausch (ab Score 155)</div><div class="help-desc">Gegenüberliegende Kugeln tauschen sofort die Plätze: Pink ⇄ Cyan und Gelb ⇄ Lila. Schnell umdenken!</div></div>
+            </div>
         </div>
 
         <div class="help-section">
@@ -499,6 +503,7 @@ const ITEM_SLOW = 'SLOW';
 const ITEM_SHIELD = 'SHIELD';
 const ITEM_CLEAR = 'CLEAR';
 const ITEM_WIDEGAP = 'WIDEGAP';
+const ITEM_SWAP = 'SWAP';
 
 window.addEventListener('keydown', (e) => {
     keys[e.code] = true;
@@ -797,21 +802,30 @@ function update() {
             } else if (obs.type === TYPE_TRIPLE_GAP) {
                 if (wideGapTimer > 0) { success = true; }
                 else {
-                let leftBallX = (cX < pX) ? cX : pX;
-                let rightBallX = (cX < pX) ? pX : cX;
-                let yellowInCenter = (yX - sphereRadius + 1 >= obs.gapX2 && yX + sphereRadius - 1 <= obs.gapX2 + obs.gapWidth2);
-                let leftInGap = (leftBallX - sphereRadius + 1 >= obs.gapX && leftBallX + sphereRadius - 1 <= obs.gapX + obs.gapWidth);
-                let rightInGap = (rightBallX - sphereRadius + 1 >= obs.gapX3 && rightBallX + sphereRadius - 1 <= obs.gapX3 + obs.gapWidth3);
-
-                let tripleAnySuccess = yellowInCenter || leftInGap || rightInGap;
-                let tripleAllFail = !yellowInCenter && !leftInGap && !rightInGap;
+                // Alle aktiven Kugeln gegen alle drei Lücken prüfen. Mit 4 Kugeln
+                // gibt es ZWEI gültige Ausrichtungen (Pink/Cyan außen ODER Gelb/Lila
+                // außen) — die alte Logik kannte nur die erste und gab sonst
+                // fälschlich Game Over.
+                let tripleBalls = [pX, cX, yX];
+                if (score >= 125) tripleBalls.push(bX);
+                const tripleGaps = [
+                    [obs.gapX, obs.gapWidth],
+                    [obs.gapX2, obs.gapWidth2],
+                    [obs.gapX3, obs.gapWidth3]
+                ];
+                let tripleAnySuccess = false;
+                for (let ballX of tripleBalls) {
+                    for (let g of tripleGaps) {
+                        if (ballX - sphereRadius + 1 >= g[0] && ballX + sphereRadius - 1 <= g[0] + g[1]) {
+                            tripleAnySuccess = true;
+                            closestDist = Math.min(closestDist, getDistanceToGapEdges(ballX, g[0], g[1]));
+                        }
+                    }
+                }
 
                 if (tripleAnySuccess) {
                     success = true;
-                    if (yellowInCenter) closestDist = Math.min(closestDist, getDistanceToGapEdges(yX, obs.gapX2, obs.gapWidth2));
-                    if (leftInGap) closestDist = Math.min(closestDist, getDistanceToGapEdges(leftBallX, obs.gapX, obs.gapWidth));
-                    if (rightInGap) closestDist = Math.min(closestDist, getDistanceToGapEdges(rightBallX, obs.gapX3, obs.gapWidth3));
-                } else if (tripleAllFail) {
+                } else {
                     if (hasShield) {
                         hasShield = false;
                         obs.passed = true;
@@ -946,6 +960,12 @@ function activateItem(effect) {
         hasShield = true;
         shieldTimer = 10.2;
         createFloatingText("Schild aktiv! 🛡️", orbitX, orbitY - 50);
+    } else if (effect === ITEM_SWAP) {
+        // Gegenüberliegende Farben tauschen die Plätze (= 180°-Sprung des Rads)
+        orbitAngle += Math.PI;
+        targetOrbitAngle += Math.PI;
+        createFloatingText("🔀 FARBTAUSCH!", orbitX, orbitY - 50);
+        [COLOR_PINK, COLOR_CYAN, COLOR_YELLOW, COLOR_PURPLE].forEach(c => triggerJuiceEffect(c));
     } else if (effect === ITEM_WIDEGAP) {
         wideGapTimer = 5.2;
         createFloatingText("↔ BREITE LÜCKEN!", orbitX, orbitY - 50);
@@ -1165,7 +1185,8 @@ function createObstacle() {
         let itemEffect = ITEM_SLOW;
         let rarityRoll = Math.random();
 
-        if (rarityRoll < 0.10) itemEffect = ITEM_SHIELD;
+        if (score >= 155 && rarityRoll >= 0.88) itemEffect = ITEM_SWAP;
+        else if (rarityRoll < 0.10) itemEffect = ITEM_SHIELD;
         else if (rarityRoll < 0.25) itemEffect = ITEM_STAR;
         else if (rarityRoll < 0.45) itemEffect = ITEM_WIDEGAP;
         else if (rarityRoll < 0.70) itemEffect = ITEM_CLEAR;
@@ -1306,6 +1327,7 @@ function drawItem(item) {
     if (item.effect === ITEM_SHIELD) icon = "🛡️";
     if (item.effect === ITEM_CLEAR) icon = "💥";
     if (item.effect === ITEM_WIDEGAP) icon = "↔";
+    if (item.effect === ITEM_SWAP) icon = "🔀";
     
     ctx.fillText(icon, 0, 1);
     ctx.restore();
@@ -1633,21 +1655,20 @@ const MUSIC_BPM = 150;
 const MUSIC_TRANSPOSE = 0; // Halbtöne; 0 = A-Moll, -2 = G-Moll
 const STEP16 = 60 / MUSIC_BPM / 4;
 const EIGHTH = STEP16 * 2;
-// VERSION 5 (Experiment) — Perpetuum mobile: Am – F – Dm – E
-// Durchlaufende Achtelbewegung ohne Pausen (der "Puzzle-Spiel-Motor"),
-// Bogen: Arpeggio hoch → Zickzack runter, Kadenz mit Lauf und Hängeton.
-// Stil an Tetris-/Crazy-Frog-Energie angelehnt — eigene Komposition.
+// VERSION 6 (Experiment) — Galopp-Hook: Em – G – D – Am
+// Punktierter Galopp-Rhythmus (DAM-da-DAAM ×2) als Markenzeichen, dann
+// laufende Antwort und langer Zielton. Eigene Komposition, Chiptune-Lead.
 const MUSIC_CHORDS = [
+    { bass: 40, arpRoot: 52, minor: true,
+      melody: { 0:[76,3], 3:[74,1], 4:[76,4], 8:[79,3], 11:[76,1], 12:[79,4], 16:[81,2], 18:[79,2], 20:[78,2], 22:[76,2], 24:[74,8] } },
+    { bass: 43, arpRoot: 55, minor: false,
+      melody: { 0:[74,3], 3:[71,1], 4:[74,4], 8:[79,3], 11:[74,1], 12:[79,4], 16:[81,2], 18:[79,2], 20:[78,2], 22:[74,2], 24:[71,8] } },
+    { bass: 50, arpRoot: 62, minor: false,
+      melody: { 0:[74,3], 3:[71,1], 4:[74,4], 8:[78,3], 11:[74,1], 12:[78,4], 16:[79,2], 18:[78,2], 20:[76,2], 22:[74,2], 24:[76,8] } },
     { bass: 45, arpRoot: 57, minor: true,
-      melody: { 0:[69,2], 2:[72,2], 4:[76,2], 6:[81,2], 8:[79,2], 10:[76,2], 12:[77,2], 14:[74,2], 16:[76,2], 18:[72,2], 20:[74,2], 22:[71,2], 24:[72,2], 26:[69,2], 28:[71,2], 30:[67,2] } },
-    { bass: 41, arpRoot: 53, minor: false,
-      melody: { 0:[69,2], 2:[72,2], 4:[77,2], 6:[81,2], 8:[79,2], 10:[77,2], 12:[76,2], 14:[72,2], 16:[74,2], 18:[77,2], 20:[76,2], 22:[72,2], 24:[74,2], 26:[71,2], 28:[72,2], 30:[69,2] } },
-    { bass: 50, arpRoot: 62, minor: true,
-      melody: { 0:[74,2], 2:[77,2], 4:[81,2], 6:[79,2], 8:[77,2], 10:[74,2], 12:[76,2], 14:[72,2], 16:[74,2], 18:[71,2], 20:[72,2], 22:[74,2], 24:[76,2], 26:[77,2], 28:[76,2], 30:[74,2] } },
-    { bass: 40, arpRoot: 52, minor: false,  // Kadenz: Halteton, Lauf, B-Hängeton → zieht zu A
-      melody: { 0:[71,4], 6:[68,2], 8:[76,4], 14:[74,2], 16:[72,2], 20:[71,2], 24:[69,2], 26:[68,2], 28:[71,4] } }
+      melody: { 0:[72,3], 3:[69,1], 4:[72,4], 8:[76,3], 11:[72,1], 12:[76,4], 16:[74,2], 18:[76,2], 20:[74,2], 22:[71,2], 24:[74,8] } }
 ];
-const ARP_SEQ = [0, 3, 1, 3, 2, 3, 1, 3, 0, 3, 1, 3, 2, 3, 1, 3];
+const ARP_SEQ = [0, 1, 2, 3, 3, 2, 1, 0, 0, 1, 2, 3, 3, 2, 1, 0];
 
 function midiFreq(m) { return 440 * Math.pow(2, (m + MUSIC_TRANSPOSE - 69) / 12); }
 
@@ -1979,7 +2000,7 @@ const TUTORIAL_SLIDES = [
       test: { score: 27, force: 'ZEBRA' } },
     { icon: '💣', title: 'Bomben', text: 'Statt eines Balkens fällt eine Bombe. Weiche ihr mit allen Kugeln aus – eine Berührung bedeutet Game Over (außer du hast ein Schild).',
       test: { score: 12, force: 'BOMB' } },
-    { icon: '✨', title: 'Items', text: '🌟 Star Immunity · ⏳ Zeitlupe\n🛡️ Schild · 💥 Sprengung · ↔ Breite Lücken\n\nFliege durch sie hindurch um sie zu aktivieren.',
+    { icon: '✨', title: 'Items', text: '🌟 Star Immunity · ⏳ Zeitlupe\n🛡️ Schild · 💥 Sprengung · ↔ Breite Lücken\n🔀 Farbtausch (ab Score 155): gegenüberliegende Kugeln tauschen die Plätze!\n\nFliege durch sie hindurch um sie zu aktivieren.',
       test: { score: 10, itemBoost: true } },
     { icon: '🚀', title: 'Los geht\'s!', text: 'Erreiche hohe Scores und schlage deine Freunde in der Bestenliste.\n\nViel Erfolg!',
       test: null }

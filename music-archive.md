@@ -158,3 +158,43 @@ const MUSIC_CHORDS = [
 ];
 const ARP_SEQ = [0, 1, 2, 3, 0, 1, 2, 3, 0, 2, 1, 3, 0, 1, 3, 2];
 ```
+
+---
+
+## Version 5 — "Perpetuum mobile Chiptune" (2026-08-10)
+
+Stand von Commit `ce7cf82`. Durchlaufende Achtelbewegung über Am–F–Dm–E,
+Kadenz-Phrase mit Halteton, Lauf und B-Hängeton. Rechteck-Lead (Chiptune,
+seit V3). User-Urteil: "klingt schon ganz gut, aber noch nicht perfekt".
+
+```javascript
+// VERSION 5 (Experiment) — Perpetuum mobile: Am – F – Dm – E
+const MUSIC_CHORDS = [
+    { bass: 45, arpRoot: 57, minor: true,
+      melody: { 0:[69,2], 2:[72,2], 4:[76,2], 6:[81,2], 8:[79,2], 10:[76,2], 12:[77,2], 14:[74,2], 16:[76,2], 18:[72,2], 20:[74,2], 22:[71,2], 24:[72,2], 26:[69,2], 28:[71,2], 30:[67,2] } },
+    { bass: 41, arpRoot: 53, minor: false,
+      melody: { 0:[69,2], 2:[72,2], 4:[77,2], 6:[81,2], 8:[79,2], 10:[77,2], 12:[76,2], 14:[72,2], 16:[74,2], 18:[77,2], 20:[76,2], 22:[72,2], 24:[74,2], 26:[71,2], 28:[72,2], 30:[69,2] } },
+    { bass: 50, arpRoot: 62, minor: true,
+      melody: { 0:[74,2], 2:[77,2], 4:[81,2], 6:[79,2], 8:[77,2], 10:[74,2], 12:[76,2], 14:[72,2], 16:[74,2], 18:[71,2], 20:[72,2], 22:[74,2], 24:[76,2], 26:[77,2], 28:[76,2], 30:[74,2] } },
+    { bass: 40, arpRoot: 52, minor: false,
+      melody: { 0:[71,4], 6:[68,2], 8:[76,4], 14:[74,2], 16:[72,2], 20:[71,2], 24:[69,2], 26:[68,2], 28:[71,4] } }
+];
+const ARP_SEQ = [0, 3, 1, 3, 2, 3, 1, 3, 0, 3, 1, 3, 2, 3, 1, 3];
+
+// Chiptune-Lead (gilt für V3–V5, ersetzt den Sägezahn-Lead von V1/V2):
+function leadVoice(freq, t, dur) {
+    [-6, 6].forEach(det => {
+        const o = audioCtx.createOscillator();
+        o.type = 'square'; o.frequency.value = freq; o.detune.value = det;
+        const f = audioCtx.createBiquadFilter();
+        f.type = 'lowpass'; f.frequency.value = 3000; f.Q.value = 1;
+        const g = audioCtx.createGain();
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(0.045, t + 0.01);
+        g.gain.setValueAtTime(0.045, t + dur);
+        g.gain.exponentialRampToValueAtTime(0.001, t + dur + 0.05);
+        o.connect(f); f.connect(g); g.connect(musicMaster); g.connect(musicDelay);
+        o.start(t); o.stop(t + dur + 0.15);
+    });
+}
+```
