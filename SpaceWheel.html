@@ -1701,18 +1701,18 @@ const MUSIC_BPM = 150;
 const MUSIC_TRANSPOSE = 0; // Halbtöne; 0 = A-Moll, -2 = G-Moll
 const STEP16 = 60 / MUSIC_BPM / 4;
 const EIGHTH = STEP16 * 2;
-// VERSION 7 (Experiment) — Synkopen-Hook: Em – G – D – Am
-// Synkopierter Auftakt (Pickup neben dem Beat), steigende Antwort,
-// Höhepunkt-Phrase auf D, Schluss auf dem Leitton B → zieht zurück zu E.
+// VERSION 8 (Experiment) — Harmonisch: C – G – Am – F ("die vier Akkorde")
+// Sangliche Melodie mit ZWEITER STIMME in Terzen darunter (melody-Einträge:
+// [Note, Länge, Terzstimme]) — parallele Terzen = warmer, harmonischer Klang.
 const MUSIC_CHORDS = [
-    { bass: 40, arpRoot: 52, minor: true,
-      melody: { 0:[76,2], 3:[79,1], 4:[76,2], 6:[74,2], 8:[71,4], 12:[74,2], 14:[76,2], 16:[79,4], 20:[81,2], 22:[79,2], 24:[76,2], 26:[74,6] } },
+    { bass: 48, arpRoot: 60, minor: false,
+      melody: { 0:[76,4,72], 6:[74,2,71], 8:[76,2,72], 10:[79,2,76], 12:[76,4,72], 16:[72,4,69], 22:[74,2,71], 24:[76,2,72], 26:[74,6,71] } },
     { bass: 43, arpRoot: 55, minor: false,
-      melody: { 0:[74,2], 3:[79,1], 4:[74,2], 6:[71,2], 8:[67,4], 12:[71,2], 14:[74,2], 16:[79,4], 20:[81,2], 22:[79,2], 24:[74,2], 26:[71,6] } },
-    { bass: 50, arpRoot: 62, minor: false,
-      melody: { 0:[78,2], 3:[81,1], 4:[78,2], 6:[76,2], 8:[74,4], 12:[76,2], 14:[78,2], 16:[81,4], 20:[83,2], 22:[81,2], 24:[78,2], 26:[76,6] } },
+      melody: { 0:[74,4,71], 6:[71,2,67], 8:[74,2,71], 10:[79,2,76], 12:[74,4,71], 16:[71,4,67], 22:[72,2,69], 24:[74,2,71], 26:[71,6,67] } },
     { bass: 45, arpRoot: 57, minor: true,
-      melody: { 0:[76,2], 3:[81,1], 4:[76,2], 6:[72,2], 8:[69,4], 12:[71,2], 14:[72,2], 16:[74,4], 20:[72,2], 22:[71,2], 24:[69,2], 26:[71,6] } }
+      melody: { 0:[72,4,69], 6:[71,2,67], 8:[72,2,69], 10:[76,2,72], 12:[74,4,71], 16:[71,4,67], 22:[69,2,65], 24:[71,2,67], 26:[72,6,69] } },
+    { bass: 41, arpRoot: 53, minor: false,
+      melody: { 0:[72,4,69], 6:[69,2,65], 8:[72,2,69], 10:[77,2,74], 12:[76,4,72], 16:[74,4,71], 22:[72,2,69], 24:[74,2,71], 26:[72,6,69] } }
 ];
 const ARP_SEQ = [0, 1, 2, 3, 3, 2, 1, 0, 0, 1, 2, 3, 3, 2, 1, 0];
 
@@ -1797,13 +1797,17 @@ function playStep(step, t) {
     const note = chord.arpRoot + iv2[ARP_SEQ[si % 16]] + (si >= 16 ? 12 : 0);
     const cutoff = 500 + 2400 * (0.5 - 0.5 * Math.cos(2 * Math.PI * loopPhase));
     arpVoice(midiFreq(note), t, si % 4 === 0 ? 0.04 : 0.028, cutoff);
-    // Lead-Melodie: das Riff, das hängen bleiben soll
+    // Lead-Melodie: das Riff, das hängen bleiben soll — plus Terzstimme darunter
     const mel = chord.melody[si];
-    if (mel) leadVoice(midiFreq(mel[0]), t, mel[1] * STEP16);
+    if (mel) {
+        leadVoice(midiFreq(mel[0]), t, mel[1] * STEP16);
+        if (mel[2]) leadVoice(midiFreq(mel[2]), t, mel[1] * STEP16, 0.55);
+    }
 }
 
-function leadVoice(freq, t, dur) {
-    // V3: Rechteckwelle für Chiptune-Charakter, kurze knackige Hüllkurve
+function leadVoice(freq, t, dur, vol) {
+    // Rechteckwelle für Chiptune-Charakter; vol < 1 für die Terzstimme
+    const peak = 0.045 * (vol || 1);
     [-6, 6].forEach(det => {
         const o = audioCtx.createOscillator();
         o.type = 'square'; o.frequency.value = freq; o.detune.value = det;
@@ -1811,8 +1815,8 @@ function leadVoice(freq, t, dur) {
         f.type = 'lowpass'; f.frequency.value = 3000; f.Q.value = 1;
         const g = audioCtx.createGain();
         g.gain.setValueAtTime(0, t);
-        g.gain.linearRampToValueAtTime(0.045, t + 0.01);
-        g.gain.setValueAtTime(0.045, t + dur);
+        g.gain.linearRampToValueAtTime(peak, t + 0.01);
+        g.gain.setValueAtTime(peak, t + dur);
         g.gain.exponentialRampToValueAtTime(0.001, t + dur + 0.05);
         o.connect(f); f.connect(g); g.connect(musicMaster); g.connect(musicDelay);
         o.start(t); o.stop(t + dur + 0.15);
