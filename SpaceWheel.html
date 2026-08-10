@@ -475,6 +475,7 @@ let slowMotionTimer = 0;
 let hasShield = false;
 let shieldTimer = 0;
 let clearCharges = 0; // Sprengung: Anzahl noch zu sprengender Balken
+let clearExplodeCooldown = 0; // kurze Pause zwischen zwei Sprengungen
 let starPowerTimer = 0; 
 let itemCooldownBalken = 0;
 let wideGapTimer = 0;
@@ -570,6 +571,7 @@ function resetGame() {
     hasShield = false;
     shieldTimer = 0;
     clearCharges = 0;
+    clearExplodeCooldown = 0;
     starPowerTimer = 0;
     itemCooldownBalken = 0;
     wideGapTimer = 0;
@@ -616,6 +618,7 @@ function update() {
 
     let currentSpeed = settings.speed;
     if (tutorialTestActive) currentSpeed = Math.min(currentSpeed, 330);
+    if (slowMotionTimer > 0 && starPowerTimer <= 0) currentSpeed *= 0.5;
     const prevStarPower = starPowerTimer;
     if (starPowerTimer > 0) starPowerTimer = Math.max(0, starPowerTimer - dt);
     if (slowMotionTimer > 0) slowMotionTimer = Math.max(0, slowMotionTimer - dt);
@@ -702,14 +705,27 @@ function update() {
         }
     }
 
+    // Sprengung: nacheinander jeweils den untersten sichtbaren Balken sprengen,
+    // mit kurzer Pause zwischen den Explosionen, bis alle Ladungen verbraucht sind
+    if (clearExplodeCooldown > 0) clearExplodeCooldown -= dt;
+    if (clearCharges > 0 && clearExplodeCooldown <= 0) {
+        let targetIdx = -1;
+        for (let i = 0; i < obstacles.length; i++) {
+            const o = obstacles[i];
+            if (o.passed || o.y + o.height < 0) continue;
+            if (targetIdx === -1 || o.y > obstacles[targetIdx].y) targetIdx = i;
+        }
+        if (targetIdx >= 0) {
+            explodeBar(obstacles[targetIdx]);
+            obstacles.splice(targetIdx, 1);
+            clearCharges--;
+            clearExplodeCooldown = 0.35;
+        }
+    }
+
     for (let i = obstacles.length - 1; i >= 0; i--) {
         let obs = obstacles[i];
         obs.y += currentSpeed * dt;
-
-        // Sprengung: Balken explodiert, sobald er sichtbar wird
-        if (clearCharges > 0 && !obs.isAutoExploded && !obs.passed && obs.y >= -obs.height) {
-            explodeBar(obs);
-        }
 
 
         // --- HIER MUSS DER CODE REIN ---
@@ -981,20 +997,19 @@ function activateItem(effect) {
         wideGapTimer = 5.2;
         createFloatingText("↔ BREITE LÜCKEN!", orbitX, orbitY - 50);
     } else if (effect === ITEM_CLEAR) {
-        // Sprengt die nächsten 3 Balken — jeder explodiert einzeln, sobald sichtbar
+        // Sprengt die nächsten 3 Balken — nacheinander, jeweils der gerade
+        // sichtbare (Ablauf im Update-Loop)
         clearCharges = 3;
         createFloatingText("💥 SPRENGUNG!", orbitX, orbitY - 50);
-        for (let o of obstacles) {
-            if (clearCharges <= 0) break;
-            if (!o.passed && !o.isAutoExploded && o.y >= -o.height) explodeBar(o);
-        }
     }
 }
 
 function explodeBar(obs) {
-    obs.isAutoExploded = true;
-    clearCharges--;
+    // Balken verschwindet sofort mit Explosionsanimation und gibt +1
     playSfx('explode');
+    score += 1;
+    scoreEl.innerText = score;
+    createFloatingText("💥 +1 Gesprengt!", orbitX, orbitY - 50);
     for (let j = 0; j < 45; j++) {
         particles.push({
             x: Math.random() * canvas.width,
@@ -2111,7 +2126,7 @@ function tutorialTry() {
     tutorialTestActive = true;
     obstacles = []; items = []; particles = [];
     gameOver = false;
-    slowMotionTimer = 0; hasShield = false; shieldTimer = 0; clearCharges = 0;
+    slowMotionTimer = 0; hasShield = false; shieldTimer = 0; clearCharges = 0; clearExplodeCooldown = 0;
     starPowerTimer = 0; wideGapTimer = 0; itemCooldownBalken = 0;
     lastPattern = -1; lastColorStr = ''; colorStreakCount = 0; perfectStreak = 0;
     currentRequiredInterval = FIXED_INTERVAL;
