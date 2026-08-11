@@ -1603,7 +1603,7 @@ const WORLDS = [
         ],
         star: '#ffd8c0', stars: 32, starSize: [0.6, 2.0], starTop: 0.52, bigStars: 1, seed: 6,
         planet: null, moon: null, decor: 'volcano',
-        ambient: { c: '#ff9a4a', n: 32, vy: -30, drift: 14, r: 1.5 }
+        ambient: { c: '#ffd45c', n: 32, vy: -30, drift: 14, r: 1.5 }
     }
 ];
 let forcedWorld = null; // im Welten-Testmodus gesetzt
@@ -1926,16 +1926,24 @@ const WORLD_DECOR = {
 
     // Vulkanwelt: Vulkankegel mit glühenden Kratern und echten Lavaströmen
     volcano(g, c, rnd) {
-        // Kantige Krustenscholle statt runder Fleck
+        // Zackige, aufgebrochene Krustenscholle: 4–6 Ecken mit stark
+        // schwankendem Radius, dadurch scharfe Kanten statt weicher Formen
         const shard = (x, y, r, rot) => {
+            const n = 4 + Math.floor(rnd() * 3);
+            const verts = [];
+            for (let k = 0; k < n; k++) {
+                const a = (k / n) * Math.PI * 2 + (rnd() - 0.5) * 0.85;
+                const rr = r * (0.40 + rnd() * 0.95);
+                verts.push({ x: Math.cos(a) * rr, y: Math.sin(a) * rr * 0.62 });
+            }
             g.save(); g.translate(x, y); g.rotate(rot);
             g.beginPath();
-            g.moveTo(-r, -r * 0.48);
-            g.lineTo(r * 0.35, -r * 0.78);
-            g.lineTo(r, r * 0.12);
-            g.lineTo(r * 0.15, r * 0.72);
-            g.lineTo(-r * 0.72, r * 0.42);
-            g.closePath(); g.fill();
+            verts.forEach((v, k) => k === 0 ? g.moveTo(v.x, v.y) : g.lineTo(v.x, v.y));
+            g.closePath();
+            g.fill();
+            // Scharfe Bruchkante hebt die Ecken hervor
+            g.strokeStyle = 'rgba(255,214,90,0.30)';
+            g.lineWidth = 0.8; g.lineJoin = 'miter'; g.stroke();
             g.restore();
         };
 
@@ -1947,9 +1955,9 @@ const WORLD_DECOR = {
 
         // Warme Grundglut vom Boden her
         const glow = g.createLinearGradient(0, c.height * 0.80, 0, c.height);
-        glow.addColorStop(0, 'rgba(255,90,15,0)');
-        glow.addColorStop(0.6, 'rgba(255,105,20,0.20)');
-        glow.addColorStop(1, 'rgba(255,150,45,0.40)');
+        glow.addColorStop(0, 'rgba(255,170,20,0)');
+        glow.addColorStop(0.6, 'rgba(255,185,25,0.20)');
+        glow.addColorStop(1, 'rgba(255,215,70,0.40)');
         g.fillStyle = glow;
         g.fillRect(0, c.height * 0.80, c.width, c.height * 0.20);
 
@@ -1974,14 +1982,14 @@ const WORLD_DECOR = {
                 const sx = cx + (rnd() * 2 - 1) * w * 0.55;
                 g.beginPath(); g.moveTo(sx, top + 10 + rnd() * 30);
                 for (let k = 0; k < 3; k++) g.lineTo(sx + (rnd() * 2 - 1) * 18, top + 40 + k * 40 + rnd() * 25);
-                g.strokeStyle = 'rgba(255,130,40,0.7)'; g.lineWidth = 1.4;
-                g.shadowBlur = 9; g.shadowColor = '#ff7000'; g.stroke(); g.shadowBlur = 0;
+                g.strokeStyle = 'rgba(255,200,50,0.7)'; g.lineWidth = 1.4;
+                g.shadowBlur = 9; g.shadowColor = '#ffb800'; g.stroke(); g.shadowBlur = 0;
             }
             // Kraterschlund
             g.beginPath();
             g.ellipse(cx, top + 2, w * 0.11, 3, 0, 0, Math.PI * 2);
-            g.fillStyle = '#ffe28a';
-            g.shadowBlur = 14; g.shadowColor = '#ff7a10';
+            g.fillStyle = '#fff7b0';
+            g.shadowBlur = 14; g.shadowColor = '#ffc410';
             g.fill(); g.shadowBlur = 0;
         });
 
@@ -1991,11 +1999,11 @@ const WORLD_DECOR = {
             const cx = p.x * c.width, top = topOf(p);
             const hot = g.createLinearGradient(0, top, 0, c.height);
             hot.addColorStop(0.00, '#ffffff');
-            hot.addColorStop(0.05, '#fff2a4');
-            hot.addColorStop(0.18, '#ffc722');
-            hot.addColorStop(0.42, '#ff8f0a');
-            hot.addColorStop(0.72, '#ff5806');
-            hot.addColorStop(1.00, '#ee3607');
+            hot.addColorStop(0.06, '#fffdcc');
+            hot.addColorStop(0.20, '#fff23c');
+            hot.addColorStop(0.45, '#ffd616');
+            hot.addColorStop(0.75, '#ffb40a');
+            hot.addColorStop(1.00, '#ff9005');
 
             for (let s = 0; s < 2; s++) {
                 const dir = s === 0 ? -1 : 1;
@@ -2017,10 +2025,10 @@ const WORLD_DECOR = {
                     const t = i / (pts.length - 1);
                     g.beginPath();
                     g.moveTo(pts[i].x, pts[i].y); g.lineTo(pts[i + 1].x, pts[i + 1].y);
-                    g.strokeStyle = 'rgba(255,130,30,0.22)';
+                    g.strokeStyle = 'rgba(255,200,40,0.22)';
                     g.lineWidth = widthAt(t) * 3.4;
                     g.lineCap = 'round';
-                    g.shadowBlur = 28; g.shadowColor = '#ff6a00';
+                    g.shadowBlur = 28; g.shadowColor = '#ffb400';
                     g.stroke();
                 }
                 g.shadowBlur = 0;
@@ -2064,9 +2072,9 @@ const WORLD_DECOR = {
 
         // Lavasee am unteren Rand, in den die Ströme münden
         const lake = g.createLinearGradient(0, c.height * 0.955, 0, c.height);
-        lake.addColorStop(0, 'rgba(200,45,8,0.85)');
-        lake.addColorStop(0.5, '#ff5a0a');
-        lake.addColorStop(1, '#ffc247');
+        lake.addColorStop(0, 'rgba(255,150,10,0.88)');
+        lake.addColorStop(0.5, '#ffcf14');
+        lake.addColorStop(1, '#fff37a');
         g.fillStyle = lake;
         g.beginPath();
         g.moveTo(0, c.height);
@@ -2138,17 +2146,17 @@ function drawEruptions() {
     if (craterFlash > 0) {
         volcanoCraters.forEach(cr => {
             const gr = ctx.createRadialGradient(cr.x, cr.y, 0, cr.x, cr.y, 55);
-            gr.addColorStop(0, 'rgba(255,220,120,' + (0.5 * craterFlash) + ')');
-            gr.addColorStop(1, 'rgba(255,110,20,0)');
+            gr.addColorStop(0, 'rgba(255,244,160,' + (0.55 * craterFlash) + ')');
+            gr.addColorStop(1, 'rgba(255,190,30,0)');
             ctx.fillStyle = gr;
             ctx.fillRect(cr.x - 55, cr.y - 55, 110, 110);
         });
     }
-    ctx.shadowBlur = 14; ctx.shadowColor = '#ff7a10';
+    ctx.shadowBlur = 14; ctx.shadowColor = '#ffc010';
     for (const b of lavaBombs) {
         ctx.save();
         ctx.translate(b.x, b.y); ctx.rotate(b.rot);
-        ctx.fillStyle = b.vy < 0 ? '#fff0b0' : '#ffab30';
+        ctx.fillStyle = b.vy < 0 ? '#fffbcc' : '#ffd63c';
         ctx.beginPath();
         ctx.moveTo(0, -b.s); ctx.lineTo(b.s * 0.85, -b.s * 0.15);
         ctx.lineTo(b.s * 0.3, b.s); ctx.lineTo(-b.s * 0.7, b.s * 0.4);
