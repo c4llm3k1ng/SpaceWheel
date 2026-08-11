@@ -1,4 +1,4 @@
-const CACHE = 'orbit-sync-v50';
+const CACHE = 'orbit-sync-v51';
 const STATIC_ASSETS = [
     './manifest.json',
     './icon-192.png',
@@ -21,11 +21,13 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+    if (e.request.method !== 'GET') return;
     const url = new URL(e.request.url);
 
     // Network-first für die Haupt-HTML: immer frische Version laden.
     // cache: 'no-cache' erzwingt Revalidierung am Server und umgeht den
-    // HTTP-Cache des Browsers (GitHub Pages sendet max-age=600)
+    // HTTP-Cache des Browsers (GitHub Pages sendet max-age=600).
+    // Offline: Fallback auf die zuletzt gecachte Version.
     if (url.pathname.endsWith('SpaceWheel.html') || url.pathname.endsWith('/SpaceWheel/')) {
         e.respondWith(
             fetch(e.request, { cache: 'no-cache' })
@@ -37,6 +39,22 @@ self.addEventListener('fetch', e => {
         );
         return;
     }
+
+    // Firebase-SDK-Skripte vom CDN: cache-first und beim ersten Laden
+    // nachcachen — nötig, damit das Spiel offline überhaupt startet
+    if (url.hostname.endsWith('gstatic.com')) {
+        e.respondWith(
+            caches.match(e.request).then(r => r || fetch(e.request).then(resp => {
+                const clone = resp.clone();
+                caches.open(CACHE).then(c => c.put(e.request, clone));
+                return resp;
+            }))
+        );
+        return;
+    }
+
+    // Live-API-Traffic (Firestore/Auth) niemals cachen
+    if (url.hostname.includes('googleapis.com')) return;
 
     // Cache-first für Icons und Manifest (ändern sich selten)
     e.respondWith(

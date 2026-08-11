@@ -1685,9 +1685,28 @@ const firebaseConfig = {
     messagingSenderId: "285962836143",
     appId: "1:285962836143:web:c8ae7720d14cacc7e39c5a"
 };
-firebase.initializeApp(firebaseConfig);
-const fbAuth = firebase.auth();
-const fbDb = firebase.firestore();
+// Offline-fest: wenn das Firebase-SDK nicht geladen werden konnte (kein Netz
+// beim ersten Start), darf das Spiel nicht abstürzen — dann greifen Stubs und
+// die App startet direkt als Gast im Menü.
+let firebaseReady = false;
+let fbAuth, fbDb;
+try {
+    firebase.initializeApp(firebaseConfig);
+    fbAuth = firebase.auth();
+    fbDb = firebase.firestore();
+    firebaseReady = true;
+} catch (e) {
+    const offlineFail = () => Promise.reject(new Error('offline'));
+    const docStub = { get: offlineFail, set: offlineFail, update: offlineFail };
+    const queryStub = { get: offlineFail, limit: () => queryStub, orderBy: () => queryStub, where: () => queryStub };
+    fbDb = { collection: () => Object.assign({ doc: () => docStub }, queryStub) };
+    fbAuth = {
+        onAuthStateChanged: cb => cb(null),
+        signInWithEmailAndPassword: offlineFail,
+        createUserWithEmailAndPassword: offlineFail,
+        signOut: offlineFail
+    };
+}
 
 let fbUser = null;
 let fbUserData = null;
@@ -2400,6 +2419,10 @@ function escapeHtml(s) {
 
 async function renderLeaderboard(tab) {
     const listEl = document.getElementById('lb-list');
+    if (!firebaseReady || !navigator.onLine) {
+        listEl.innerHTML = '<div style="text-align:center;color:#555;padding:40px;">📡 Keine Internetverbindung<br><br>Die Bestenliste ist offline nicht verfügbar. Dein Highscore wird lokal gespeichert und später synchronisiert.</div>';
+        return;
+    }
     listEl.innerHTML = '<div style="text-align:center;color:#555;padding:40px;">Laden...</div>';
     try {
         let rows = [];
@@ -2565,12 +2588,25 @@ document.getElementById('add-friend-input').addEventListener('keydown', e => { i
 fbAuth.onAuthStateChanged(async (user) => {
     if (user) {
         fbUser = user;
-        await loadUserData(user.uid);
-        showScreen(null);
-        openHamburger();
+        try {
+            await loadUserData(user.uid);
+        } catch (e) {
+            // Offline oder Firestore nicht erreichbar: mit lokalem Stand weiterspielen
+        }
+        // Nur umschalten, wenn wir noch auf dem Login-Screen sind (nicht mitten im Spiel)
+        if (document.getElementById('auth-screen').classList.contains('active')) {
+            showScreen(null);
+            openHamburger();
+        }
     } else {
         fbUser = null;
         fbUserData = null;
+        if (!navigator.onLine || !firebaseReady) {
+            // Ohne Internet: Login überspringen, als Gast im Menü starten
+            isGuest = true;
+            showScreen(null);
+            openHamburger();
+        }
         if (!isGuest) showScreen('auth-screen');
     }
 });
