@@ -179,12 +179,18 @@
             border-radius: 999px; padding: 10px 20px; font-size: 14px; font-weight: bold; cursor: pointer;
         }
 
-        #help-screen, #settings-screen {
+        #help-screen, #settings-screen, #worlds-screen {
             display: none; position: fixed; inset: 0; z-index: 300;
             background: #0a0a0f; flex-direction: column; align-items: center;
             overflow-y: auto; padding: 20px 16px 40px;
         }
-        #help-screen.active, #settings-screen.active { display: flex; }
+        #help-screen.active, #settings-screen.active, #worlds-screen.active { display: flex; }
+        .world-item {
+            width: 100%; background: #13141a; border: 1px solid #2a2b3d; border-radius: 12px;
+            padding: 14px 16px; margin-bottom: 8px; display: flex; gap: 12px;
+            align-items: center; cursor: pointer; text-align: left; color: #e0e0e0;
+        }
+        .world-item:active { background: #1e1f2e; }
         .help-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; width: 100%; max-width: 420px; }
         .help-back { background: #1e1f2e; border: none; color: #fff; width: 38px; height: 38px; border-radius: 50%; font-size: 20px; cursor: pointer; flex-shrink: 0; }
         .help-title-text { font-size: 20px; font-weight: bold; }
@@ -275,6 +281,9 @@
             </button>
             <button class="ham-item" onclick="closeHamburger(); openHelp()">
                 <span class="ham-icon">❓</span> Hilfe
+            </button>
+            <button class="ham-item" onclick="closeHamburger(); openWorlds()">
+                <span class="ham-icon">🌍</span> Welten
             </button>
             <button class="ham-item" onclick="closeHamburger(); openSettings()">
                 <span class="ham-icon">⚙️</span> Einstellungen
@@ -428,6 +437,19 @@
                 <div class="help-icon">🚀</div>
                 <div><div class="help-name">Risky-Serien</div><div class="help-desc">25, 50, 100, 150, 200 und 250 Riskys in Folge geben jeweils einmalig genauso viele Bonuspunkte (+25, +50, +100 …).</div></div>
             </div>
+        </div>
+    </div>
+
+    <!-- Welten Screen -->
+    <div id="worlds-screen">
+        <div class="help-header">
+            <button class="help-back" onclick="closeWorlds()">←</button>
+            <div class="help-title-text">🌍 Welten</div>
+        </div>
+        <div class="help-section">
+            <div class="help-sec-title">Zum Ausprobieren antippen</div>
+            <div id="worlds-list"></div>
+            <div class="help-desc" style="padding:10px 4px 0;">Im Testmodus bleibt die gewählte Welt dauerhaft aktiv. Über „▶ Spielen" im Menü geht es zurück ins normale Spiel, in dem die Welten mit dem Score wechseln.</div>
         </div>
     </div>
 
@@ -610,7 +632,7 @@ function resetGame() {
     perfectStreak = 0;
     isDragging = false;
     lastTime = performance.now();
-    currentWorld = WORLDS[0];
+    currentWorld = forcedWorld || WORLDS[0];
     worldCanvas = null;
     prevWorldCanvas = null;
     worldFade = 1;
@@ -744,17 +766,20 @@ function update() {
     // mit kurzer Pause zwischen den Explosionen, bis alle Ladungen verbraucht sind
     if (clearExplodeCooldown > 0) clearExplodeCooldown -= dt;
     if (clearCharges > 0 && clearExplodeCooldown <= 0) {
+        // Erst zünden, wenn der Balken gut sichtbar in der Feldmitte ist —
+        // das macht die Explosion deutlich eindrucksvoller
+        const explodeLine = canvas.height * 0.38;
         let targetIdx = -1;
         for (let i = 0; i < obstacles.length; i++) {
             const o = obstacles[i];
-            if (o.passed || o.y + o.height < 0) continue;
+            if (o.passed || o.y < explodeLine) continue;
             if (targetIdx === -1 || o.y > obstacles[targetIdx].y) targetIdx = i;
         }
         if (targetIdx >= 0) {
             explodeBar(obstacles[targetIdx]);
             obstacles.splice(targetIdx, 1);
             clearCharges--;
-            clearExplodeCooldown = 0.35;
+            clearExplodeCooldown = 0.25;
         }
     }
 
@@ -1442,17 +1467,17 @@ function drawItem(item) {
 // (nahezu schwarz), nur der Farbton variiert — niemals die Helligkeit.
 const WORLDS = [
     {
-        name: 'Tiefer Raum', minScore: 0,
+        name: 'Tiefer Raum', icon: '🌌', minScore: 0,
         sky: ['#141228', '#06060e'],
         nebulas: [
             { x: 0.22, y: 0.22, r: 0.55, c: '#5a2ac0', a: 0.20 },
             { x: 0.82, y: 0.62, r: 0.50, c: '#1b3fa0', a: 0.16 }
         ],
         star: '#ffffff', stars: 95, seed: 1,
-        planet: null, ambient: null
+        planet: null, moon: null, ambient: null
     },
     {
-        name: 'Eisplanet', minScore: 25,
+        name: 'Eisplanet', icon: '🧊', minScore: 25,
         sky: ['#0e2b3d', '#03101b'],
         nebulas: [
             { x: 0.25, y: 0.26, r: 0.55, c: '#1f8fb5', a: 0.20 },
@@ -1460,9 +1485,59 @@ const WORLDS = [
         ],
         star: '#d8f3ff', stars: 75, seed: 2,
         planet: { fill: '#0c2c3e', rim: 'rgba(130,235,255,0.5)' },
-        ambient: 'snow'
+        moon: null,
+        ambient: { c: '#dff4ff', n: 34, vy: 26, drift: 8, r: 1.7 }
+    },
+    {
+        name: 'Wüstenplanet', icon: '🏜️', minScore: 60,
+        sky: ['#2a1a11', '#0c0605'],
+        nebulas: [
+            { x: 0.28, y: 0.30, r: 0.55, c: '#b35a1c', a: 0.17 },
+            { x: 0.78, y: 0.70, r: 0.50, c: '#7a3410', a: 0.15 }
+        ],
+        star: '#ffe6c8', stars: 60, seed: 3,
+        planet: { fill: '#3a2113', rim: 'rgba(255,180,90,0.45)' },
+        moon: { x: 0.76, y: 0.16, r: 0.13, fill: '#2e1c11', rim: 'rgba(255,200,140,0.4)' },
+        ambient: { c: '#e8c49a', n: 40, vy: 14, drift: 34, r: 1.3 }
+    },
+    {
+        name: 'Smaragdwelt', icon: '🌿', minScore: 100,
+        sky: ['#0c2618', '#020f09'],
+        nebulas: [
+            { x: 0.24, y: 0.28, r: 0.55, c: '#1f9f62', a: 0.17 },
+            { x: 0.80, y: 0.64, r: 0.50, c: '#0f6f7a', a: 0.15 }
+        ],
+        star: '#d2ffe6', stars: 70, seed: 4,
+        planet: { fill: '#0b2a1a', rim: 'rgba(120,255,190,0.45)' },
+        moon: null,
+        ambient: { c: '#9dffc8', n: 28, vy: -18, drift: 12, r: 1.6 }
+    },
+    {
+        name: 'Gasriese', icon: '🪐', minScore: 150,
+        sky: ['#1b1030', '#07030f'],
+        nebulas: [
+            { x: 0.26, y: 0.24, r: 0.58, c: '#7a2ad0', a: 0.19 },
+            { x: 0.78, y: 0.68, r: 0.52, c: '#c02a8a', a: 0.14 }
+        ],
+        star: '#f0e0ff', stars: 85, seed: 5,
+        planet: null,
+        moon: { x: 0.72, y: 0.19, r: 0.22, fill: '#1c1134', rim: 'rgba(210,150,255,0.45)', rings: true },
+        ambient: { c: '#e8ccff', n: 26, vy: 10, drift: 40, r: 1.2 }
+    },
+    {
+        name: 'Vulkanwelt', icon: '🌋', minScore: 210,
+        sky: ['#240d0b', '#090302'],
+        nebulas: [
+            { x: 0.30, y: 0.32, r: 0.55, c: '#c03a10', a: 0.16 },
+            { x: 0.74, y: 0.72, r: 0.52, c: '#8a1030', a: 0.14 }
+        ],
+        star: '#ffd8c0', stars: 55, seed: 6,
+        planet: { fill: '#2e0f08', rim: 'rgba(255,120,40,0.55)' },
+        moon: null,
+        ambient: { c: '#ff9a4a', n: 32, vy: -30, drift: 14, r: 1.5 }
     }
 ];
+let forcedWorld = null; // im Welten-Testmodus gesetzt
 
 let currentWorld = WORLDS[0];
 let worldCanvas = null, prevWorldCanvas = null, worldFade = 1;
@@ -1478,6 +1553,7 @@ function mulberry32(a) {
 }
 
 function getWorld(s) {
+    if (forcedWorld) return forcedWorld;
     let w = WORLDS[0];
     for (const world of WORLDS) if (s >= world.minScore) w = world;
     return w;
@@ -1514,6 +1590,22 @@ function renderWorldCanvas(world) {
     }
     g.globalAlpha = 1;
 
+    if (world.moon) {
+        const m = world.moon;
+        const mx = m.x * c.width, my = m.y * c.height, mr = m.r * c.width;
+        if (m.rings) {
+            g.save();
+            g.translate(mx, my); g.rotate(-0.35); g.scale(1, 0.24);
+            g.beginPath(); g.arc(0, 0, mr * 1.75, 0, Math.PI * 2);
+            g.strokeStyle = m.rim; g.lineWidth = mr * 0.30; g.stroke();
+            g.restore();
+        }
+        g.beginPath(); g.arc(mx, my, mr, 0, Math.PI * 2);
+        g.fillStyle = m.fill; g.fill();
+        g.beginPath(); g.arc(mx, my, mr, Math.PI * 0.75, Math.PI * 1.55);
+        g.strokeStyle = m.rim; g.lineWidth = 1.5; g.stroke();
+    }
+
     if (world.planet) {
         // Planetenkuppe am unteren Rand — deutlich unterhalb des Rads
         const pr = c.width * 0.95, pcx = c.width / 2, pcy = c.height + pr * 0.72;
@@ -1527,16 +1619,18 @@ function renderWorldCanvas(world) {
 
 function initAmbient(world) {
     ambientParticles = [];
-    if (world.ambient !== 'snow') return;
+    const a = world.ambient;
+    if (!a) return;
     const rnd = mulberry32(world.seed * 104729);
-    for (let i = 0; i < 34; i++) {
+    for (let i = 0; i < a.n; i++) {
         ambientParticles.push({
             x: rnd() * canvas.width,
             y: rnd() * canvas.height,
-            vy: rnd() * 26 + 12,
-            drift: rnd() * 16 - 8,
-            r: rnd() * 1.7 + 0.7,
-            a: rnd() * 0.4 + 0.2
+            vy: a.vy * (0.6 + rnd() * 0.8),
+            drift: (rnd() * 2 - 1) * a.drift,
+            r: rnd() * a.r + 0.6,
+            a: rnd() * 0.4 + 0.2,
+            c: a.c
         });
     }
 }
@@ -1555,7 +1649,10 @@ function updateWorld(dt) {
     for (const p of ambientParticles) {
         p.y += p.vy * dt;
         p.x += p.drift * dt;
-        if (p.y > canvas.height + 4) { p.y = -4; p.x = Math.random() * canvas.width; }
+        if (p.vy > 0 && p.y > canvas.height + 4) { p.y = -4; p.x = Math.random() * canvas.width; }
+        else if (p.vy < 0 && p.y < -4) { p.y = canvas.height + 4; p.x = Math.random() * canvas.width; }
+        if (p.x < -6) p.x = canvas.width + 6;
+        else if (p.x > canvas.width + 6) p.x = -6;
     }
 }
 
@@ -1572,7 +1669,7 @@ function drawWorldBackdrop() {
 
     for (const p of ambientParticles) {
         ctx.globalAlpha = p.a * (worldFade < 1 ? worldFade : 1);
-        ctx.fillStyle = '#dff4ff';
+        ctx.fillStyle = p.c;
         ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
     }
     ctx.globalAlpha = 1;
@@ -1873,7 +1970,7 @@ let authMode = 'login';
 let isGuest = false;
 
 function showScreen(id) {
-    ['auth-screen','leaderboard-screen','add-friend-screen','help-screen']
+    ['auth-screen','leaderboard-screen','add-friend-screen','help-screen','settings-screen','worlds-screen']
         .forEach(s => document.getElementById(s).classList.remove('active'));
     document.getElementById('hamburger-menu').classList.remove('active');
     closeTutorial();
@@ -1915,6 +2012,7 @@ function startPlayFromMenu() {
         maybeAskTutorial();
         return;
     }
+    if (forcedWorld) { forcedWorld = null; resetGame(); }
     closeHamburger();
 }
 function maybeAskTutorial() {
@@ -1951,6 +2049,31 @@ function tutorialAskClose() {
     // Nach "Nein" + "OK": das Spiel starten — dafür wurde ja "Spielen" gedrückt
     document.getElementById('tutorial-ask').classList.remove('active');
     closeHamburger();
+}
+
+// ── Welten-Testmodus ────────────────────────────────────────
+function openWorlds() {
+    document.getElementById('worlds-list').innerHTML = WORLDS.map((w, i) =>
+        '<button class="world-item" onclick="playWorld(' + i + ')">' +
+        '<div class="help-icon">' + w.icon + '</div>' +
+        '<div><div class="help-name">' + w.name + '</div>' +
+        '<div class="help-desc">Im Spiel ab Score ' + w.minScore + '</div></div></button>'
+    ).join('');
+    document.getElementById('worlds-screen').classList.add('active');
+    document.getElementById('hamburger-btn').style.display = 'none';
+    gamePaused = true;
+}
+function closeWorlds() {
+    document.getElementById('worlds-screen').classList.remove('active');
+    openHamburger();
+}
+function playWorld(i) {
+    forcedWorld = WORLDS[i];
+    document.getElementById('worlds-screen').classList.remove('active');
+    document.getElementById('hamburger-menu').classList.remove('active');
+    resetGame();
+    document.getElementById('hamburger-btn').style.display = 'flex';
+    gamePaused = false;
 }
 
 // ── Einstellungen ───────────────────────────────────────────
