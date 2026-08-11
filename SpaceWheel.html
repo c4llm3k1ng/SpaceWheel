@@ -1568,15 +1568,15 @@ const WORLDS = [
         ambient: { c: '#e8c49a', n: 40, vy: 14, drift: 34, r: 1.3 }
     },
     {
-        name: 'Smaragdwelt', icon: '🌿', minScore: 100,
+        name: 'Smaragdwelt', icon: '💎', minScore: 100,
         sky: ['#0c2618', '#020f09'],
         nebulas: [
             { x: 0.24, y: 0.28, r: 0.55, c: '#1f9f62', a: 0.17 },
             { x: 0.80, y: 0.64, r: 0.50, c: '#0f6f7a', a: 0.15 }
         ],
         star: '#d2ffe6', stars: 80, starSize: [0.4, 2.1], starTop: 0.84, bigStars: 4, seed: 4,
-        planet: null, moon: null, decor: 'jungle',
-        ambient: { c: '#9dffc8', n: 28, vy: -18, drift: 12, r: 1.6 }
+        planet: null, moon: null, decor: 'crystal',
+        ambient: { c: '#8dffd0', n: 24, vy: -14, drift: 10, r: 1.4 }
     },
     {
         name: 'Gasriese', icon: '🪐', minScore: 150,
@@ -1804,40 +1804,92 @@ const WORLD_DECOR = {
         });
     },
 
-    // Smaragdwelt: Blätterdach aus überlappenden Kronen, Leuchtranken
-    jungle(g, c, rnd) {
-        // Hohe Baumstämme an den Rändern
-        g.fillStyle = '#123f27';
-        [0.05, 0.93].forEach((fx, i) => {
-            const x = fx * c.width;
-            g.fillRect(x, c.height * (0.66 + i * 0.04), 13, c.height);
-        });
-        g.fillStyle = '#16482d';
-        g.fillRect(0, c.height * 0.945, c.width, c.height * 0.055);
-        for (let i = 0; i < 32; i++) {
-            const x = rnd() * (c.width + 60) - 30;
-            const y = c.height * (GROUND_TOP + 0.025) + rnd() * (c.height * 0.10);
-            const r = 20 + rnd() * 34;
-            g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2);
-            g.fillStyle = i % 3 === 0 ? '#1d5c39' : '#14442a'; g.fill();
+    // Smaragdwelt: aufragende Kristallformationen mit Facetten
+    crystal(g, c, rnd) {
+        // Grüner Schein vom Kristallfeld
+        const glow = g.createLinearGradient(0, c.height * 0.78, 0, c.height);
+        glow.addColorStop(0, 'rgba(30,255,150,0)');
+        glow.addColorStop(1, 'rgba(30,255,150,0.17)');
+        g.fillStyle = glow;
+        g.fillRect(0, c.height * 0.78, c.width, c.height * 0.22);
+
+        // Dunkler Fels als Sockel
+        g.beginPath();
+        g.moveTo(0, c.height);
+        for (let x = 0; x <= c.width; x += 10) {
+            g.lineTo(x, c.height * 0.935 + Math.sin(x / 40) * 7 + Math.sin(x / 13) * 3);
         }
-        // Lichtsaum auf den obersten Kronen
-        for (let i = 0; i < 10; i++) {
-            const x = rnd() * c.width;
-            const y = c.height * (GROUND_TOP + 0.02) + rnd() * 14;
-            const r = 22 + rnd() * 24;
-            g.beginPath(); g.arc(x, y, r, Math.PI * 1.15, Math.PI * 1.85);
-            g.strokeStyle = 'rgba(140,255,190,0.35)'; g.lineWidth = 2; g.stroke();
-        }
-        // Leuchtende Ranken an den Rändern, weit weg vom Spielbereich
-        g.strokeStyle = 'rgba(120,255,180,0.28)'; g.lineWidth = 2;
-        [0.03, 0.97].forEach((fx, i) => {
+        g.lineTo(c.width, c.height);
+        g.closePath();
+        g.fillStyle = '#07231a'; g.fill();
+
+        // Einzelner Smaragd-Kristall: Silhouette, helle Facette, Kanten
+        const crystalAt = (bx, by, h, w, tilt, bright) => {
+            const tipX = bx + tilt, tipY = by - h;
+            const shX = bx + tilt * 0.6, shY = by - h * 0.70;
+            const pts = [
+                { x: bx - w, y: by },
+                { x: bx + w, y: by },
+                { x: shX + w * 0.72, y: shY },
+                { x: tipX, y: tipY },
+                { x: shX - w * 0.72, y: shY }
+            ];
             g.beginPath();
-            const x0 = fx * c.width;
-            g.moveTo(x0, 0);
-            for (let y = 0; y <= c.height * 0.6; y += 14) g.lineTo(x0 + Math.sin(y / 46 + i * 2) * 14, y);
-            g.stroke();
+            pts.forEach((p, i) => i === 0 ? g.moveTo(p.x, p.y) : g.lineTo(p.x, p.y));
+            g.closePath();
+            const body = g.createLinearGradient(bx - w, by, bx + w, tipY);
+            body.addColorStop(0, bright ? '#0f5537' : '#0a3826');
+            body.addColorStop(1, bright ? '#27ad72' : '#146b4b');
+            g.fillStyle = body;
+            g.shadowBlur = 16; g.shadowColor = 'rgba(40,255,160,0.5)';
+            g.fill(); g.shadowBlur = 0;
+
+            // Linke Facette fängt das Licht
+            g.beginPath();
+            g.moveTo(tipX, tipY);
+            g.lineTo(pts[4].x, pts[4].y);
+            g.lineTo(pts[0].x, pts[0].y);
+            g.lineTo(bx, by);
+            g.closePath();
+            g.fillStyle = 'rgba(130,255,205,0.17)'; g.fill();
+
+            // Mittelgrat und Außenkanten
+            g.beginPath(); g.moveTo(tipX, tipY); g.lineTo(bx, by);
+            g.strokeStyle = 'rgba(165,255,220,0.45)'; g.lineWidth = 1.2; g.stroke();
+            g.beginPath();
+            pts.forEach((p, i) => i === 0 ? g.moveTo(p.x, p.y) : g.lineTo(p.x, p.y));
+            g.closePath();
+            g.strokeStyle = 'rgba(150,255,205,0.55)'; g.lineWidth = 1.3; g.stroke();
+        };
+
+        // Große Formationen an den Rändern, fern vom Spielbereich
+        [[0.05, 0.29, 11], [0.95, 0.25, -13]].forEach(([fx, fh, tilt]) => {
+            const bx = fx * c.width, by = c.height * 0.95;
+            crystalAt(bx, by, c.height * fh, 15, tilt, true);
+            crystalAt(bx + (tilt > 0 ? 24 : -26), by, c.height * fh * 0.58, 10, tilt * 1.3, false);
+            crystalAt(bx + (tilt > 0 ? -16 : 18), by, c.height * fh * 0.40, 8, -tilt * 0.7, false);
         });
+
+        // Kristallfeld am Boden
+        for (let i = 0; i < 18; i++) {
+            const bx = rnd() * c.width;
+            const by = c.height * (0.925 + rnd() * 0.055);
+            const h = c.height * (0.035 + rnd() * 0.08);
+            crystalAt(bx, by, h, 6 + rnd() * 10, (rnd() * 2 - 1) * 11, rnd() > 0.6);
+        }
+
+        // Schwebende Kristallsplitter im Himmel
+        for (let i = 0; i < 5; i++) {
+            const x = rnd() * c.width, y = c.height * (0.10 + rnd() * 0.42), s = 4 + rnd() * 7;
+            g.save(); g.translate(x, y); g.rotate(rnd() * Math.PI);
+            g.beginPath();
+            g.moveTo(0, -s); g.lineTo(s * 0.5, 0); g.lineTo(0, s); g.lineTo(-s * 0.5, 0);
+            g.closePath();
+            g.fillStyle = 'rgba(90,255,190,0.30)';
+            g.shadowBlur = 10; g.shadowColor = 'rgba(60,255,170,0.7)';
+            g.fill(); g.shadowBlur = 0;
+            g.restore();
+        }
     },
 
     // Gasriese: breite Wolkenbänder quer über den Himmel
