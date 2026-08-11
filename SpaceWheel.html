@@ -403,7 +403,7 @@
             </div>
             <div class="help-item">
                 <div class="help-icon">💥</div>
-                <div><div class="help-name">Sprengung (3 Balken)</div><div class="help-desc">Die nächsten 3 Balken explodieren automatisch, sobald sie sichtbar werden – jeder gibt +1 Punkt.</div></div>
+                <div><div class="help-name">Sprengung (3 Balken)</div><div class="help-desc">Die Kugel, die das Item einsammelt, schießt auf die nächsten 3 Balken. Beim Treffer explodieren sie – jeder gibt +1 Punkt.</div></div>
             </div>
             <div class="help-item">
                 <div class="help-icon">↔</div>
@@ -525,7 +525,9 @@ let slowMotionTimer = 0;
 let hasShield = false;
 let shieldTimer = 0;
 let clearCharges = 0; // Sprengung: Anzahl noch zu sprengender Balken
-let clearExplodeCooldown = 0; // kurze Pause zwischen zwei Sprengungen
+let clearExplodeCooldown = 0; // kurze Pause zwischen zwei Schüssen
+let clearShooterColor = null; // Farbe der Kugel, die das Item eingesammelt hat
+let projectiles = [];
 let starPowerTimer = 0; 
 let itemCooldownBalken = 0;
 let wideGapTimer = 0;
@@ -622,6 +624,8 @@ function resetGame() {
     shieldTimer = 0;
     clearCharges = 0;
     clearExplodeCooldown = 0;
+    clearShooterColor = null;
+    projectiles = [];
     starPowerTimer = 0;
     itemCooldownBalken = 0;
     wideGapTimer = 0;
@@ -700,8 +704,8 @@ function update() {
     } else if (slowMotionTimer > 0) {
         levelEl.innerText = '⏳ ZEITLUPE AKTIV';
         levelEl.style.color = '#00f2fe';
-    } else if (clearCharges > 0) {
-        levelEl.innerText = '💥 SPRENGUNG: noch ' + clearCharges + ' Balken';
+    } else if (clearCharges > 0 || projectiles.length > 0) {
+        levelEl.innerText = '💥 SPRENGUNG: noch ' + (clearCharges + projectiles.length) + ' Balken';
         levelEl.style.color = '#ff3300';
     } else if (wideGapTimer > 0) {
         levelEl.innerText = '↔ BREITE LÜCKEN AKTIV';
@@ -751,7 +755,7 @@ function update() {
         let dist = Math.hypot(coord.x - item.x, coord.y - item.y);
 
         if (dist <= sphereRadius + 14) {
-            activateItem(item.effect);
+            activateItem(item.effect, item.color);
             triggerJuiceEffect(item.color);
             items.splice(i, 1);
             continue;
@@ -766,22 +770,21 @@ function update() {
     // mit kurzer Pause zwischen den Explosionen, bis alle Ladungen verbraucht sind
     if (clearExplodeCooldown > 0) clearExplodeCooldown -= dt;
     if (clearCharges > 0 && clearExplodeCooldown <= 0) {
-        // Erst zünden, wenn der Balken gut sichtbar in der Feldmitte ist —
-        // das macht die Explosion deutlich eindrucksvoller
+        // Erst schießen, wenn der Balken gut sichtbar in der Feldmitte ist
         const explodeLine = canvas.height * 0.38;
         let targetIdx = -1;
         for (let i = 0; i < obstacles.length; i++) {
             const o = obstacles[i];
-            if (o.passed || o.y < explodeLine) continue;
+            if (o.passed || o._targeted || o.y < explodeLine) continue;
             if (targetIdx === -1 || o.y > obstacles[targetIdx].y) targetIdx = i;
         }
         if (targetIdx >= 0) {
-            explodeBar(obstacles[targetIdx]);
-            obstacles.splice(targetIdx, 1);
+            fireClearShot(obstacles[targetIdx]);
             clearCharges--;
             clearExplodeCooldown = 0.25;
         }
     }
+    updateProjectiles(dt);
 
     for (let i = obstacles.length - 1; i >= 0; i--) {
         let obs = obstacles[i];
@@ -1032,7 +1035,7 @@ function update() {
     }
 }
 
-function activateItem(effect) {
+function activateItem(effect, itemColor) {
     playSfx('pickup');
     if (effect === ITEM_STAR) {
         starPowerTimer = 6.2;
@@ -1057,10 +1060,63 @@ function activateItem(effect) {
         wideGapTimer = 5.2;
         createFloatingText("↔ BREITE LÜCKEN!", orbitX, orbitY - 50);
     } else if (effect === ITEM_CLEAR) {
-        // Sprengt die nächsten 3 Balken — nacheinander, jeweils der gerade
-        // sichtbare (Ablauf im Update-Loop)
+        // Die einsammelnde Kugel schießt auf die nächsten 3 Balken, sobald
+        // diese die Feldmitte erreichen (Ablauf im Update-Loop)
         clearCharges = 3;
+        clearShooterColor = itemColor || COLOR_PINK;
         createFloatingText("💥 SPRENGUNG!", orbitX, orbitY - 50);
+    }
+}
+
+// Aktuelle Position der Kugel einer bestimmten Farbe
+function ballPosFor(color) {
+    const pX = orbitX + Math.cos(orbitAngle) * orbitRadius;
+    const pY = orbitY + Math.sin(orbitAngle) * orbitRadius;
+    const yX = orbitX + Math.cos(orbitAngle + Math.PI / 2) * orbitRadius;
+    const yY = orbitY + Math.sin(orbitAngle + Math.PI / 2) * orbitRadius;
+    const cX = orbitX + Math.cos(orbitAngle + Math.PI) * orbitRadius;
+    const cY = orbitY + Math.sin(orbitAngle + Math.PI) * orbitRadius;
+    const bX = orbitX + Math.cos(orbitAngle + Math.PI * 1.5) * orbitRadius;
+    const bY = orbitY + Math.sin(orbitAngle + Math.PI * 1.5) * orbitRadius;
+    return getTargetCoordinates(color, pX, pY, cX, cY, yX, yY, bX, bY);
+}
+
+function fireClearShot(bar) {
+    const from = ballPosFor(clearShooterColor);
+    projectiles.push({
+        x: from.x, y: from.y,
+        color: clearShooterColor || COLOR_PINK,
+        bar: bar, trail: []
+    });
+    bar._targeted = true;
+    playSfx('shoot');
+}
+
+function updateProjectiles(dt) {
+    const SPEED = 1150;
+    const collisionTop = orbitY - orbitRadius - sphereRadius;
+    for (let i = projectiles.length - 1; i >= 0; i--) {
+        const pr = projectiles[i];
+        const idx = obstacles.indexOf(pr.bar);
+        if (idx === -1 || pr.bar.passed) { projectiles.splice(i, 1); continue; }
+
+        const tx = canvas.width / 2, ty = pr.bar.y + pr.bar.height / 2;
+        const dx = tx - pr.x, dy = ty - pr.y;
+        const d = Math.hypot(dx, dy) || 1;
+        const step = SPEED * dt;
+
+        // Sicherheitsnetz: erreicht der Balken die Kollisionszone, sofort sprengen
+        const tooClose = pr.bar.y + pr.bar.height >= collisionTop;
+        if (d <= step + 8 || tooClose) {
+            explodeBar(pr.bar);
+            obstacles.splice(idx, 1);
+            projectiles.splice(i, 1);
+            continue;
+        }
+        pr.x += dx / d * step;
+        pr.y += dy / d * step;
+        pr.trail.push({ x: pr.x, y: pr.y });
+        if (pr.trail.length > 7) pr.trail.shift();
     }
 }
 
@@ -1473,7 +1529,7 @@ const WORLDS = [
             { x: 0.22, y: 0.22, r: 0.55, c: '#5a2ac0', a: 0.20 },
             { x: 0.82, y: 0.62, r: 0.50, c: '#1b3fa0', a: 0.16 }
         ],
-        star: '#ffffff', stars: 95, seed: 1,
+        star: '#ffffff', stars: 110, starSize: [0.4, 2.4], starTop: 1.0, bigStars: 6, seed: 1,
         planet: null, moon: null, decor: 'galaxy', ambient: null
     },
     {
@@ -1483,7 +1539,7 @@ const WORLDS = [
             { x: 0.25, y: 0.26, r: 0.55, c: '#1f8fb5', a: 0.20 },
             { x: 0.80, y: 0.66, r: 0.50, c: '#2b5fa8', a: 0.15 }
         ],
-        star: '#d8f3ff', stars: 75, seed: 2,
+        star: '#d8f3ff', stars: 70, starSize: [0.3, 1.2], starTop: 0.78, bigStars: 3, seed: 2,
         planet: null, moon: null, decor: 'ice',
         ambient: { c: '#dff4ff', n: 34, vy: 26, drift: 8, r: 1.7 }
     },
@@ -1494,7 +1550,7 @@ const WORLDS = [
             { x: 0.28, y: 0.30, r: 0.55, c: '#b35a1c', a: 0.17 },
             { x: 0.78, y: 0.70, r: 0.50, c: '#7a3410', a: 0.15 }
         ],
-        star: '#ffe6c8', stars: 60, seed: 3,
+        star: '#ffe6c8', stars: 42, starSize: [0.5, 1.7], starTop: 0.60, bigStars: 2, seed: 3,
         planet: null,
         moon: { x: 0.76, y: 0.16, r: 0.13, fill: '#2e1c11', rim: 'rgba(255,200,140,0.4)' },
         decor: 'dunes',
@@ -1507,7 +1563,7 @@ const WORLDS = [
             { x: 0.24, y: 0.28, r: 0.55, c: '#1f9f62', a: 0.17 },
             { x: 0.80, y: 0.64, r: 0.50, c: '#0f6f7a', a: 0.15 }
         ],
-        star: '#d2ffe6', stars: 70, seed: 4,
+        star: '#d2ffe6', stars: 80, starSize: [0.4, 2.1], starTop: 0.84, bigStars: 4, seed: 4,
         planet: null, moon: null, decor: 'jungle',
         ambient: { c: '#9dffc8', n: 28, vy: -18, drift: 12, r: 1.6 }
     },
@@ -1518,7 +1574,7 @@ const WORLDS = [
             { x: 0.26, y: 0.24, r: 0.58, c: '#7a2ad0', a: 0.19 },
             { x: 0.78, y: 0.68, r: 0.52, c: '#c02a8a', a: 0.14 }
         ],
-        star: '#f0e0ff', stars: 85, seed: 5,
+        star: '#f0e0ff', stars: 125, starSize: [0.3, 1.1], starTop: 1.0, bigStars: 7, seed: 5,
         planet: null,
         moon: { x: 0.72, y: 0.19, r: 0.22, fill: '#1c1134', rim: 'rgba(210,150,255,0.45)', rings: true },
         decor: 'bands',
@@ -1531,7 +1587,7 @@ const WORLDS = [
             { x: 0.30, y: 0.32, r: 0.55, c: '#c03a10', a: 0.16 },
             { x: 0.74, y: 0.72, r: 0.52, c: '#8a1030', a: 0.14 }
         ],
-        star: '#ffd8c0', stars: 55, seed: 6,
+        star: '#ffd8c0', stars: 32, starSize: [0.6, 2.0], starTop: 0.52, bigStars: 1, seed: 6,
         planet: null, moon: null, decor: 'volcano',
         ambient: { c: '#ff9a4a', n: 32, vy: -30, drift: 14, r: 1.5 }
     }
@@ -1579,13 +1635,30 @@ function renderWorldCanvas(world) {
         g.globalAlpha = 1;
     });
 
+    // Sternenfeld: Menge, Größenbereich, Höhenausdehnung und Zahl der
+    // markanten Leuchtsterne unterscheiden sich bewusst pro Welt
     const rnd = mulberry32(world.seed * 7919);
+    const [smin, smax] = world.starSize || [0.4, 1.8];
+    const spread = world.starTop || 1;
     for (let i = 0; i < world.stars; i++) {
-        g.globalAlpha = rnd() * 0.6 + 0.15;
+        g.globalAlpha = rnd() * 0.6 + 0.12;
         g.fillStyle = rnd() > 0.85 ? '#aaddff' : world.star;
         g.beginPath();
-        g.arc(rnd() * c.width, rnd() * c.height, rnd() * 1.4 + 0.4, 0, Math.PI * 2);
+        g.arc(rnd() * c.width, rnd() * c.height * spread, smin + rnd() * (smax - smin), 0, Math.PI * 2);
         g.fill();
+    }
+    for (let i = 0; i < (world.bigStars || 0); i++) {
+        const x = rnd() * c.width, y = rnd() * c.height * spread * 0.85;
+        const r = 1.5 + rnd() * 1.5, L = r * 5;
+        g.globalAlpha = 0.8; g.fillStyle = world.star;
+        g.shadowBlur = 10; g.shadowColor = world.star;
+        g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+        g.shadowBlur = 0;
+        g.globalAlpha = 0.3; g.strokeStyle = world.star; g.lineWidth = 1;
+        g.beginPath();
+        g.moveTo(x - L, y); g.lineTo(x + L, y);
+        g.moveTo(x, y - L); g.lineTo(x, y + L);
+        g.stroke();
     }
     g.globalAlpha = 1;
 
@@ -2110,6 +2183,22 @@ function draw() {
         ctx.shadowBlur = 0; 
     }
 
+    // Sprengschüsse der Kugeln
+    projectiles.forEach(pr => {
+        pr.trail.forEach((t, i) => {
+            ctx.globalAlpha = (i + 1) / pr.trail.length * 0.5;
+            ctx.fillStyle = pr.color;
+            ctx.beginPath(); ctx.arc(t.x, t.y, 2 + i * 0.4, 0, Math.PI * 2); ctx.fill();
+        });
+        ctx.globalAlpha = 1;
+        ctx.shadowBlur = 16; ctx.shadowColor = pr.color;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(pr.x, pr.y, 5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = pr.color;
+        ctx.beginPath(); ctx.arc(pr.x, pr.y, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 0;
+    });
+
     particles.forEach(p => {
         ctx.fillStyle = p.color; ctx.globalAlpha = p.alpha; ctx.fillRect(p.x, p.y, p.size, p.size);
     });
@@ -2555,6 +2644,17 @@ function playSfx(kind) {
         o.connect(g); g.connect(sfxMaster);
         o.start(t); o.stop(t + 0.3);
         sfxThump(t, 180, 90, 0.12, 0.18);
+    } else if (kind === 'shoot') {
+        // Laserartiger Abschuss: schnell abfallender Ton
+        const o = audioCtx.createOscillator();
+        o.type = 'square';
+        o.frequency.setValueAtTime(900, t);
+        o.frequency.exponentialRampToValueAtTime(180, t + 0.12);
+        const g = audioCtx.createGain();
+        g.gain.setValueAtTime(0.16, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+        o.connect(g); g.connect(sfxMaster);
+        o.start(t); o.stop(t + 0.16);
     } else if (kind === 'explode') {
         // Gesprengter Balken
         sfxNoise(t, 0.3, 'lowpass', 900, 0.5, 0.4);
@@ -2709,13 +2809,14 @@ function tutorialTry() {
     tutSavedState = {
         score, obstacles, items, particles, gameOver,
         spawnTimer, currentRequiredInterval, slowMotionTimer, hasShield, shieldTimer,
-        clearCharges, starPowerTimer, wideGapTimer, itemCooldownBalken,
+        clearCharges, clearShooterColor, projectiles, starPowerTimer, wideGapTimer, itemCooldownBalken,
         lastPattern, lastColorStr, colorStreakCount, perfectStreak
     };
     tutorialTestActive = true;
     obstacles = []; items = []; particles = [];
     gameOver = false;
-    slowMotionTimer = 0; hasShield = false; shieldTimer = 0; clearCharges = 0; clearExplodeCooldown = 0;
+    slowMotionTimer = 0; hasShield = false; shieldTimer = 0;
+    clearCharges = 0; clearExplodeCooldown = 0; clearShooterColor = null; projectiles = [];
     starPowerTimer = 0; wideGapTimer = 0; itemCooldownBalken = 0;
     lastPattern = -1; lastColorStr = ''; colorStreakCount = 0; perfectStreak = 0;
     currentRequiredInterval = FIXED_INTERVAL;
@@ -2748,6 +2849,8 @@ function tutorialRestoreState() {
     hasShield = tutSavedState.hasShield;
     shieldTimer = tutSavedState.shieldTimer;
     clearCharges = tutSavedState.clearCharges;
+    clearShooterColor = tutSavedState.clearShooterColor;
+    projectiles = tutSavedState.projectiles;
     starPowerTimer = tutSavedState.starPowerTimer;
     wideGapTimer = tutSavedState.wideGapTimer;
     itemCooldownBalken = tutSavedState.itemCooldownBalken;
