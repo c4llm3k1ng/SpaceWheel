@@ -1917,9 +1917,9 @@ const WORLD_DECOR = {
 
         // Warme Grundglut vom Boden her
         const glow = g.createLinearGradient(0, c.height * 0.80, 0, c.height);
-        glow.addColorStop(0, 'rgba(255,70,10,0)');
-        glow.addColorStop(0.6, 'rgba(255,80,15,0.14)');
-        glow.addColorStop(1, 'rgba(255,120,30,0.30)');
+        glow.addColorStop(0, 'rgba(255,90,15,0)');
+        glow.addColorStop(0.6, 'rgba(255,105,20,0.20)');
+        glow.addColorStop(1, 'rgba(255,150,45,0.40)');
         g.fillStyle = glow;
         g.fillRect(0, c.height * 0.80, c.width, c.height * 0.20);
 
@@ -1944,14 +1944,14 @@ const WORLD_DECOR = {
                 const sx = cx + (rnd() * 2 - 1) * w * 0.55;
                 g.beginPath(); g.moveTo(sx, top + 10 + rnd() * 30);
                 for (let k = 0; k < 3; k++) g.lineTo(sx + (rnd() * 2 - 1) * 18, top + 40 + k * 40 + rnd() * 25);
-                g.strokeStyle = 'rgba(255,90,25,0.5)'; g.lineWidth = 1.2;
-                g.shadowBlur = 6; g.shadowColor = '#ff5a00'; g.stroke(); g.shadowBlur = 0;
+                g.strokeStyle = 'rgba(255,130,40,0.7)'; g.lineWidth = 1.4;
+                g.shadowBlur = 9; g.shadowColor = '#ff7000'; g.stroke(); g.shadowBlur = 0;
             }
             // Kraterschlund
             g.beginPath();
             g.ellipse(cx, top + 2, w * 0.11, 3, 0, 0, Math.PI * 2);
-            g.fillStyle = '#ffb43a';
-            g.shadowBlur = 10; g.shadowColor = '#ff5a04';
+            g.fillStyle = '#ffe28a';
+            g.shadowBlur = 14; g.shadowColor = '#ff7a10';
             g.fill(); g.shadowBlur = 0;
         });
 
@@ -1960,12 +1960,12 @@ const WORLD_DECOR = {
         peaks.forEach((p, pi) => {
             const cx = p.x * c.width, top = topOf(p);
             const hot = g.createLinearGradient(0, top, 0, c.height);
-            hot.addColorStop(0.00, '#ffe9a0');
-            hot.addColorStop(0.07, '#ffb02a');
-            hot.addColorStop(0.22, '#ff7208');
-            hot.addColorStop(0.50, '#d83506');
-            hot.addColorStop(0.78, '#a52104');
-            hot.addColorStop(1.00, '#7a1503');
+            hot.addColorStop(0.00, '#fffce8');
+            hot.addColorStop(0.07, '#ffe04e');
+            hot.addColorStop(0.22, '#ffa50c');
+            hot.addColorStop(0.50, '#ff6a05');
+            hot.addColorStop(0.78, '#f53c08');
+            hot.addColorStop(1.00, '#cf2606');
 
             for (let s = 0; s < 2; s++) {
                 const dir = s === 0 ? -1 : 1;
@@ -1987,10 +1987,10 @@ const WORLD_DECOR = {
                     const t = i / (pts.length - 1);
                     g.beginPath();
                     g.moveTo(pts[i].x, pts[i].y); g.lineTo(pts[i + 1].x, pts[i + 1].y);
-                    g.strokeStyle = 'rgba(255,95,15,0.13)';
-                    g.lineWidth = widthAt(t) * 3.2;
+                    g.strokeStyle = 'rgba(255,130,30,0.22)';
+                    g.lineWidth = widthAt(t) * 3.4;
                     g.lineCap = 'round';
-                    g.shadowBlur = 22; g.shadowColor = '#ff4a00';
+                    g.shadowBlur = 28; g.shadowColor = '#ff6a00';
                     g.stroke();
                 }
                 g.shadowBlur = 0;
@@ -2009,35 +2009,37 @@ const WORLD_DECOR = {
                 // Erkaltete Krustenschollen, nach unten hin häufiger
                 for (let i = 3; i < pts.length - 1; i++) {
                     const t = i / (pts.length - 1);
-                    if (rnd() > 0.25 + t * 0.5) continue;
+                    if (rnd() > 0.15 + t * 0.38) continue;
                     const pt = pts[i], ww = widthAt(t);
                     g.beginPath();
                     g.ellipse(pt.x + (rnd() * 2 - 1) * ww * 0.3, pt.y,
-                              ww * (0.22 + rnd() * 0.28), 1.2 + rnd() * 1.6,
+                              ww * (0.18 + rnd() * 0.24), 1.1 + rnd() * 1.4,
                               rnd() * Math.PI, 0, Math.PI * 2);
-                    g.fillStyle = 'rgba(38,11,6,0.78)';
+                    g.fillStyle = 'rgba(48,14,7,0.62)';
                     g.fill();
                 }
 
                 // Weißglühender Kern nur im obersten Abschnitt
-                const coreEnd = Math.floor(pts.length * 0.28);
+                const coreEnd = Math.floor(pts.length * 0.42);
                 for (let i = 0; i < coreEnd; i++) {
                     const t = i / (pts.length - 1);
                     g.beginPath();
                     g.moveTo(pts[i].x, pts[i].y); g.lineTo(pts[i + 1].x, pts[i + 1].y);
-                    g.strokeStyle = 'rgba(255,240,190,' + (0.8 - i / coreEnd * 0.7) + ')';
-                    g.lineWidth = widthAt(t) * 0.38;
+                    g.strokeStyle = 'rgba(255,250,215,' + (0.92 - i / coreEnd * 0.8) + ')';
+                    g.lineWidth = widthAt(t) * 0.44;
                     g.lineCap = 'round';
+                    g.shadowBlur = 8; g.shadowColor = '#ffd070';
                     g.stroke();
                 }
+                g.shadowBlur = 0;
             }
         });
 
         // Lavasee am unteren Rand, in den die Ströme münden
         const lake = g.createLinearGradient(0, c.height * 0.955, 0, c.height);
-        lake.addColorStop(0, 'rgba(120,26,6,0.75)');
-        lake.addColorStop(0.5, '#d33c08');
-        lake.addColorStop(1, '#ff8c1a');
+        lake.addColorStop(0, 'rgba(200,45,8,0.85)');
+        lake.addColorStop(0.5, '#ff5a0a');
+        lake.addColorStop(1, '#ffc247');
         g.fillStyle = lake;
         g.beginPath();
         g.moveTo(0, c.height);
