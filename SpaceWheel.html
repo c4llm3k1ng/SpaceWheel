@@ -1474,7 +1474,7 @@ const WORLDS = [
             { x: 0.82, y: 0.62, r: 0.50, c: '#1b3fa0', a: 0.16 }
         ],
         star: '#ffffff', stars: 95, seed: 1,
-        planet: null, moon: null, ambient: null
+        planet: null, moon: null, decor: 'galaxy', ambient: null
     },
     {
         name: 'Eisplanet', icon: '🧊', minScore: 25,
@@ -1484,8 +1484,7 @@ const WORLDS = [
             { x: 0.80, y: 0.66, r: 0.50, c: '#2b5fa8', a: 0.15 }
         ],
         star: '#d8f3ff', stars: 75, seed: 2,
-        planet: { fill: '#0c2c3e', rim: 'rgba(130,235,255,0.5)' },
-        moon: null,
+        planet: null, moon: null, decor: 'ice',
         ambient: { c: '#dff4ff', n: 34, vy: 26, drift: 8, r: 1.7 }
     },
     {
@@ -1496,8 +1495,9 @@ const WORLDS = [
             { x: 0.78, y: 0.70, r: 0.50, c: '#7a3410', a: 0.15 }
         ],
         star: '#ffe6c8', stars: 60, seed: 3,
-        planet: { fill: '#3a2113', rim: 'rgba(255,180,90,0.45)' },
+        planet: null,
         moon: { x: 0.76, y: 0.16, r: 0.13, fill: '#2e1c11', rim: 'rgba(255,200,140,0.4)' },
+        decor: 'dunes',
         ambient: { c: '#e8c49a', n: 40, vy: 14, drift: 34, r: 1.3 }
     },
     {
@@ -1508,8 +1508,7 @@ const WORLDS = [
             { x: 0.80, y: 0.64, r: 0.50, c: '#0f6f7a', a: 0.15 }
         ],
         star: '#d2ffe6', stars: 70, seed: 4,
-        planet: { fill: '#0b2a1a', rim: 'rgba(120,255,190,0.45)' },
-        moon: null,
+        planet: null, moon: null, decor: 'jungle',
         ambient: { c: '#9dffc8', n: 28, vy: -18, drift: 12, r: 1.6 }
     },
     {
@@ -1522,6 +1521,7 @@ const WORLDS = [
         star: '#f0e0ff', stars: 85, seed: 5,
         planet: null,
         moon: { x: 0.72, y: 0.19, r: 0.22, fill: '#1c1134', rim: 'rgba(210,150,255,0.45)', rings: true },
+        decor: 'bands',
         ambient: { c: '#e8ccff', n: 26, vy: 10, drift: 40, r: 1.2 }
     },
     {
@@ -1532,8 +1532,7 @@ const WORLDS = [
             { x: 0.74, y: 0.72, r: 0.52, c: '#8a1030', a: 0.14 }
         ],
         star: '#ffd8c0', stars: 55, seed: 6,
-        planet: { fill: '#2e0f08', rim: 'rgba(255,120,40,0.55)' },
-        moon: null,
+        planet: null, moon: null, decor: 'volcano',
         ambient: { c: '#ff9a4a', n: 32, vy: -30, drift: 14, r: 1.5 }
     }
 ];
@@ -1614,8 +1613,222 @@ function renderWorldCanvas(world) {
         g.beginPath(); g.arc(pcx, pcy, pr, Math.PI * 1.15, Math.PI * 1.85);
         g.strokeStyle = world.planet.rim; g.lineWidth = 2; g.stroke();
     }
+
+    if (world.decor && WORLD_DECOR[world.decor]) WORLD_DECOR[world.decor](g, c, rnd);
     return c;
 }
+
+// Jede Welt bekommt eine eigene Silhouette/Struktur — alles unterhalb des Rads
+// oder als sehr dezente Himmelselemente, damit der Spielbereich frei bleibt.
+const GROUND_TOP = 0.855; // ab hier darf Bodenkulisse stehen (unter dem Rad)
+
+const WORLD_DECOR = {
+    // Tiefer Raum: ferne Spiralgalaxie oben links, driftende Felsbrocken
+    galaxy(g, c, rnd) {
+        const gx = c.width * 0.24, gy = c.height * 0.13, gr = c.width * 0.19;
+        g.save();
+        g.translate(gx, gy); g.rotate(-0.5); g.scale(1, 0.42);
+        const halo = g.createRadialGradient(0, 0, 0, 0, 0, gr);
+        halo.addColorStop(0, 'rgba(190,170,255,0.30)');
+        halo.addColorStop(0.5, 'rgba(120,90,220,0.12)');
+        halo.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = halo;
+        g.beginPath(); g.arc(0, 0, gr, 0, Math.PI * 2); g.fill();
+        for (let arm = 0; arm < 2; arm++) {
+            g.beginPath();
+            for (let t = 0; t <= 1; t += 0.04) {
+                const a = arm * Math.PI + t * Math.PI * 1.7;
+                const r = t * gr * 0.92;
+                const px = Math.cos(a) * r, py = Math.sin(a) * r;
+                t === 0 ? g.moveTo(px, py) : g.lineTo(px, py);
+            }
+            g.strokeStyle = 'rgba(200,180,255,0.22)';
+            g.lineWidth = 5; g.lineCap = 'round'; g.stroke();
+        }
+        g.restore();
+        for (let i = 0; i < 7; i++) {
+            const rx = rnd() * c.width, ry = c.height * (0.45 + rnd() * 0.5), rr = 3 + rnd() * 6;
+            g.beginPath(); g.arc(rx, ry, rr, 0, Math.PI * 2);
+            g.fillStyle = 'rgba(60,58,86,0.55)'; g.fill();
+        }
+    },
+
+    // Eisplanet: Polarlichter oben, Eiszacken unten
+    ice(g, c, rnd) {
+        for (let b = 0; b < 2; b++) {
+            const yb = c.height * (0.10 + b * 0.10);
+            const grad = g.createLinearGradient(0, yb - 30, 0, yb + 70);
+            grad.addColorStop(0, 'rgba(80,255,210,0)');
+            grad.addColorStop(0.45, b === 0 ? 'rgba(80,255,205,0.14)' : 'rgba(90,190,255,0.11)');
+            grad.addColorStop(1, 'rgba(80,255,210,0)');
+            g.fillStyle = grad;
+            g.beginPath();
+            g.moveTo(0, yb);
+            for (let x = 0; x <= c.width; x += 12) g.lineTo(x, yb + Math.sin(x / 68 + b * 2.1) * 20);
+            for (let x = c.width; x >= 0; x -= 12) g.lineTo(x, yb + 62 + Math.sin(x / 68 + b * 2.1) * 20);
+            g.closePath(); g.fill();
+        }
+        const base = c.height, maxH = c.height * (1 - GROUND_TOP);
+        g.fillStyle = '#1a5f7d';
+        g.fillRect(0, c.height * 0.965, c.width, c.height * 0.035);
+        for (let i = 0; i < 10; i++) {
+            const x = (i / 9) * c.width + (rnd() * 26 - 13);
+            const h = maxH * (0.45 + rnd() * 0.55);
+            const w = 20 + rnd() * 26;
+            g.beginPath(); g.moveTo(x - w, base); g.lineTo(x, base - h); g.lineTo(x + w, base);
+            g.closePath(); g.fillStyle = '#17566f'; g.fill();
+            g.beginPath(); g.moveTo(x, base - h); g.lineTo(x + w * 0.3, base); g.lineTo(x + w, base);
+            g.closePath(); g.fillStyle = 'rgba(190,250,255,0.28)'; g.fill();
+            // Kante hervorheben
+            g.beginPath(); g.moveTo(x - w, base); g.lineTo(x, base - h);
+            g.strokeStyle = 'rgba(190,250,255,0.45)'; g.lineWidth = 1.5; g.stroke();
+        }
+    },
+
+    // Wüstenplanet: Dunstband am Horizont, geschichtete Dünen, Felsnadeln
+    dunes(g, c, rnd) {
+        const haze = g.createLinearGradient(0, c.height * 0.78, 0, c.height * 0.90);
+        haze.addColorStop(0, 'rgba(255,170,90,0)');
+        haze.addColorStop(1, 'rgba(255,150,70,0.13)');
+        g.fillStyle = haze;
+        g.fillRect(0, c.height * 0.78, c.width, c.height * 0.12);
+        // Tafelberge am Rand, damit sie das Rad nicht überlagern
+        [[0.02, 0.15, 0.795], [0.86, 0.17, 0.815]].forEach(([fx, fw, fy]) => {
+            const x = fx * c.width, w = fw * c.width, top = c.height * fy;
+            g.beginPath();
+            g.moveTo(x, c.height); g.lineTo(x + w * 0.14, top);
+            g.lineTo(x + w * 0.86, top); g.lineTo(x + w, c.height);
+            g.closePath(); g.fillStyle = '#4a2e1a'; g.fill();
+            g.beginPath(); g.moveTo(x + w * 0.14, top); g.lineTo(x + w * 0.86, top);
+            g.strokeStyle = 'rgba(255,190,120,0.5)'; g.lineWidth = 2; g.stroke();
+        });
+        [{ y: 0.865, amp: 22, col: '#5c3a20', f: 62, hi: 'rgba(255,200,130,0.45)' },
+         { y: 0.915, amp: 17, col: '#432915', f: 88, hi: 'rgba(255,180,110,0.28)' },
+         { y: 0.962, amp: 12, col: '#301c10', f: 46, hi: null }].forEach((L, li) => {
+            g.beginPath(); g.moveTo(0, c.height);
+            for (let x = 0; x <= c.width; x += 8) g.lineTo(x, c.height * L.y + Math.sin(x / L.f + li * 1.9) * L.amp);
+            g.lineTo(c.width, c.height); g.closePath();
+            g.fillStyle = L.col; g.fill();
+            if (L.hi) {
+                g.beginPath();
+                for (let x = 0; x <= c.width; x += 8) {
+                    const yy = c.height * L.y + Math.sin(x / L.f + li * 1.9) * L.amp;
+                    x === 0 ? g.moveTo(x, yy) : g.lineTo(x, yy);
+                }
+                g.strokeStyle = L.hi; g.lineWidth = 1.6; g.stroke();
+            }
+        });
+    },
+
+    // Smaragdwelt: Blätterdach aus überlappenden Kronen, Leuchtranken
+    jungle(g, c, rnd) {
+        // Hohe Baumstämme an den Rändern
+        g.fillStyle = '#123f27';
+        [0.05, 0.93].forEach((fx, i) => {
+            const x = fx * c.width;
+            g.fillRect(x, c.height * (0.66 + i * 0.04), 13, c.height);
+        });
+        g.fillStyle = '#16482d';
+        g.fillRect(0, c.height * 0.945, c.width, c.height * 0.055);
+        for (let i = 0; i < 32; i++) {
+            const x = rnd() * (c.width + 60) - 30;
+            const y = c.height * (GROUND_TOP + 0.025) + rnd() * (c.height * 0.10);
+            const r = 20 + rnd() * 34;
+            g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2);
+            g.fillStyle = i % 3 === 0 ? '#1d5c39' : '#14442a'; g.fill();
+        }
+        // Lichtsaum auf den obersten Kronen
+        for (let i = 0; i < 10; i++) {
+            const x = rnd() * c.width;
+            const y = c.height * (GROUND_TOP + 0.02) + rnd() * 14;
+            const r = 22 + rnd() * 24;
+            g.beginPath(); g.arc(x, y, r, Math.PI * 1.15, Math.PI * 1.85);
+            g.strokeStyle = 'rgba(140,255,190,0.35)'; g.lineWidth = 2; g.stroke();
+        }
+        // Leuchtende Ranken an den Rändern, weit weg vom Spielbereich
+        g.strokeStyle = 'rgba(120,255,180,0.28)'; g.lineWidth = 2;
+        [0.03, 0.97].forEach((fx, i) => {
+            g.beginPath();
+            const x0 = fx * c.width;
+            g.moveTo(x0, 0);
+            for (let y = 0; y <= c.height * 0.6; y += 14) g.lineTo(x0 + Math.sin(y / 46 + i * 2) * 14, y);
+            g.stroke();
+        });
+    },
+
+    // Gasriese: breite Wolkenbänder quer über den Himmel
+    bands(g, c, rnd) {
+        const cols = ['rgba(180,120,255,0.10)', 'rgba(255,120,200,0.08)', 'rgba(140,160,255,0.09)'];
+        for (let i = 0; i < 5; i++) {
+            const y = c.height * (0.30 + i * 0.135);
+            const h = 26 + rnd() * 34;
+            g.save();
+            g.beginPath();
+            g.ellipse(c.width * 0.5, y, c.width * (0.75 + rnd() * 0.4), h, 0, 0, Math.PI * 2);
+            g.fillStyle = cols[i % cols.length];
+            g.fill();
+            g.restore();
+        }
+    },
+
+    // Vulkanwelt: Vulkankegel mit glühenden Kratern und Lavaflüssen unten
+    volcano(g, c, rnd) {
+        // Glut am Boden
+        const glow = g.createLinearGradient(0, c.height * 0.84, 0, c.height);
+        glow.addColorStop(0, 'rgba(255,90,20,0)');
+        glow.addColorStop(1, 'rgba(255,90,20,0.22)');
+        g.fillStyle = glow;
+        g.fillRect(0, c.height * 0.84, c.width, c.height * 0.16);
+
+        const peaks = [{ x: 0.20, w: 0.34, h: 0.115 }, { x: 0.74, w: 0.42, h: 0.145 }];
+        peaks.forEach(p => {
+            const cx = p.x * c.width, w = p.w * c.width, top = c.height * (GROUND_TOP + 0.015) - c.height * p.h * 0.35;
+            g.beginPath();
+            g.moveTo(cx - w, c.height);
+            g.lineTo(cx - w * 0.20, top);
+            g.lineTo(cx + w * 0.20, top);
+            g.lineTo(cx + w, c.height);
+            g.closePath();
+            g.fillStyle = '#4a1a0c'; g.fill();
+            // Kantenlicht vom Lavaschein
+            g.beginPath();
+            g.moveTo(cx - w, c.height); g.lineTo(cx - w * 0.20, top);
+            g.lineTo(cx + w * 0.20, top); g.lineTo(cx + w, c.height);
+            g.strokeStyle = 'rgba(255,140,60,0.45)'; g.lineWidth = 1.8; g.stroke();
+            // glühender Krater
+            g.beginPath();
+            g.moveTo(cx - w * 0.20, top); g.lineTo(cx + w * 0.20, top);
+            g.strokeStyle = 'rgba(255,190,90,0.95)'; g.lineWidth = 4;
+            g.shadowBlur = 20; g.shadowColor = '#ff6a10';
+            g.stroke(); g.shadowBlur = 0;
+        });
+
+        // Lavaflüsse: geschwungene Ströme von den Kratern zum unteren Rand
+        peaks.forEach((p, pi) => {
+            const cx = p.x * c.width;
+            const top = c.height * (GROUND_TOP + 0.015) - c.height * p.h * 0.35;
+            for (let s = 0; s < 2; s++) {
+                const dir = s === 0 ? -1 : 1;
+                g.beginPath();
+                g.moveTo(cx + dir * 4, top + 2);
+                g.bezierCurveTo(
+                    cx + dir * (26 + pi * 10), top + (c.height - top) * 0.35,
+                    cx + dir * (10 + s * 30), top + (c.height - top) * 0.65,
+                    cx + dir * (52 + pi * 18 + s * 12), c.height
+                );
+                g.strokeStyle = 'rgba(255,130,30,0.75)';
+                g.lineWidth = 5 - s;
+                g.lineCap = 'round';
+                g.shadowBlur = 14; g.shadowColor = '#ff5a00';
+                g.stroke();
+                g.strokeStyle = 'rgba(255,235,160,0.6)';
+                g.lineWidth = 1.6; g.shadowBlur = 6;
+                g.stroke();
+                g.shadowBlur = 0;
+            }
+        });
+    }
+};
 
 function initAmbient(world) {
     ambientParticles = [];
