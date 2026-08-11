@@ -770,16 +770,22 @@ function update() {
     // mit kurzer Pause zwischen den Explosionen, bis alle Ladungen verbraucht sind
     if (clearExplodeCooldown > 0) clearExplodeCooldown -= dt;
     if (clearCharges > 0 && clearExplodeCooldown <= 0) {
-        // Erst schießen, wenn der Balken gut sichtbar in der Feldmitte ist
-        const explodeLine = canvas.height * 0.38;
-        let targetIdx = -1;
+        // Schuss so früh auslösen, dass der Treffer exakt in der Bildmitte liegt
+        let targetIdx = -1, fallbackIdx = -1;
         for (let i = 0; i < obstacles.length; i++) {
             const o = obstacles[i];
-            if (o.passed || o._targeted || o.y < explodeLine) continue;
-            if (targetIdx === -1 || o.y > obstacles[targetIdx].y) targetIdx = i;
+            if (o.passed || o._targeted) continue;
+            const cy = o.y + o.height / 2;
+            if (cy < CLEAR_FIRE_Y) continue;
+            if (cy < CLEAR_IMPACT_Y) {
+                if (targetIdx === -1 || o.y > obstacles[targetIdx].y) targetIdx = i;
+            } else if (fallbackIdx === -1 || o.y > obstacles[fallbackIdx].y) {
+                fallbackIdx = i;
+            }
         }
-        if (targetIdx >= 0) {
-            fireClearShot(obstacles[targetIdx]);
+        const pick = targetIdx >= 0 ? targetIdx : fallbackIdx;
+        if (pick >= 0) {
+            fireClearShot(obstacles[pick]);
             clearCharges--;
             clearExplodeCooldown = 0.25;
         }
@@ -1081,10 +1087,17 @@ function ballPosFor(color) {
     return getTargetCoordinates(color, pX, pY, cX, cY, yX, yY, bX, bY);
 }
 
+// Fester Trefferpunkt: immer mittig im Bild, ohne Varianz
+const CLEAR_IMPACT_X = canvas.width / 2;
+const CLEAR_IMPACT_Y = canvas.height * 0.42;
+const CLEAR_FIRE_Y = canvas.height * 0.22; // ab hier wird geschossen
+
 function fireClearShot(bar) {
     const from = ballPosFor(clearShooterColor);
     projectiles.push({
         x: from.x, y: from.y,
+        fromX: from.x, fromY: from.y,
+        startBarY: bar.y + bar.height / 2,
         color: clearShooterColor || COLOR_PINK,
         bar: bar, trail: []
     });
@@ -1093,30 +1106,28 @@ function fireClearShot(bar) {
 }
 
 function updateProjectiles(dt) {
-    const SPEED = 1150;
-    const collisionTop = orbitY - orbitRadius - sphereRadius;
     for (let i = projectiles.length - 1; i >= 0; i--) {
         const pr = projectiles[i];
         const idx = obstacles.indexOf(pr.bar);
         if (idx === -1 || pr.bar.passed) { projectiles.splice(i, 1); continue; }
 
-        const tx = canvas.width / 2, ty = pr.bar.y + pr.bar.height / 2;
-        const dx = tx - pr.x, dy = ty - pr.y;
-        const d = Math.hypot(dx, dy) || 1;
-        const step = SPEED * dt;
+        // Der Flug ist an den Fall des Balkens gekoppelt: Projektil und
+        // Balkenmitte erreichen CLEAR_IMPACT_Y garantiert gleichzeitig —
+        // unabhängig von Tempo, Zeitlupe oder Position der Kugel.
+        const barCenter = pr.bar.y + pr.bar.height / 2;
+        const span = CLEAR_IMPACT_Y - pr.startBarY;
+        const progress = span <= 0 ? 1 : Math.min(1, (barCenter - pr.startBarY) / span);
 
-        // Sicherheitsnetz: erreicht der Balken die Kollisionszone, sofort sprengen
-        const tooClose = pr.bar.y + pr.bar.height >= collisionTop;
-        if (d <= step + 8 || tooClose) {
+        pr.x = pr.fromX + (CLEAR_IMPACT_X - pr.fromX) * progress;
+        pr.y = pr.fromY + (CLEAR_IMPACT_Y - pr.fromY) * progress;
+        pr.trail.push({ x: pr.x, y: pr.y });
+        if (pr.trail.length > 7) pr.trail.shift();
+
+        if (progress >= 1) {
             explodeBar(pr.bar);
             obstacles.splice(idx, 1);
             projectiles.splice(i, 1);
-            continue;
         }
-        pr.x += dx / d * step;
-        pr.y += dy / d * step;
-        pr.trail.push({ x: pr.x, y: pr.y });
-        if (pr.trail.length > 7) pr.trail.shift();
     }
 }
 
@@ -2656,9 +2667,22 @@ function playSfx(kind) {
         o.connect(g); g.connect(sfxMaster);
         o.start(t); o.stop(t + 0.16);
     } else if (kind === 'explode') {
-        // Gesprengter Balken
-        sfxNoise(t, 0.3, 'lowpass', 900, 0.5, 0.4);
-        sfxThump(t, 120, 40, 0.25, 0.3);
+        // Projektil-Treffer: helles Zersplittern — bewusst anders als der
+        // dumpfe Game-Over-Crash (kein tiefer Bass-Schlag)
+        sfxNoise(t, 0.22, 'highpass', 3600, 0.8, 0.4);
+        sfxNoise(t, 0.10, 'bandpass', 1800, 1.2, 0.22);
+        [1750, 2400, 3100].forEach((fr, i) => {
+            const st = t + i * 0.035;
+            const o = audioCtx.createOscillator();
+            o.type = 'triangle';
+            o.frequency.setValueAtTime(fr, st);
+            o.frequency.exponentialRampToValueAtTime(fr * 0.55, st + 0.16);
+            const g = audioCtx.createGain();
+            g.gain.setValueAtTime(0.14 - i * 0.03, st);
+            g.gain.exponentialRampToValueAtTime(0.001, st + 0.18);
+            o.connect(g); g.connect(sfxMaster);
+            o.start(st); o.stop(st + 0.2);
+        });
     } else if (kind === 'crash') {
         // Aufprall an einem Balken: dumpfer Crash
         sfxNoise(t, 0.5, 'lowpass', 700, 0.5, 0.55);
