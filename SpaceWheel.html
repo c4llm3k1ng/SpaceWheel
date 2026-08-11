@@ -1855,62 +1855,152 @@ const WORLD_DECOR = {
         }
     },
 
-    // Vulkanwelt: Vulkankegel mit glühenden Kratern und Lavaflüssen unten
+    // Vulkanwelt: Vulkankegel mit glühenden Kratern und echten Lavaströmen
     volcano(g, c, rnd) {
-        // Glut am Boden
-        const glow = g.createLinearGradient(0, c.height * 0.84, 0, c.height);
-        glow.addColorStop(0, 'rgba(255,90,20,0)');
-        glow.addColorStop(1, 'rgba(255,90,20,0.22)');
+        const bez = (p0, p1, p2, p3, t) => {
+            const mt = 1 - t, a = mt * mt * mt, b = 3 * mt * mt * t, d = 3 * mt * t * t, e = t * t * t;
+            return { x: a * p0.x + b * p1.x + d * p2.x + e * p3.x,
+                     y: a * p0.y + b * p1.y + d * p2.y + e * p3.y };
+        };
+
+        // Warme Grundglut vom Boden her
+        const glow = g.createLinearGradient(0, c.height * 0.80, 0, c.height);
+        glow.addColorStop(0, 'rgba(255,70,10,0)');
+        glow.addColorStop(0.6, 'rgba(255,80,15,0.14)');
+        glow.addColorStop(1, 'rgba(255,120,30,0.30)');
         g.fillStyle = glow;
-        g.fillRect(0, c.height * 0.84, c.width, c.height * 0.16);
+        g.fillRect(0, c.height * 0.80, c.width, c.height * 0.20);
 
         const peaks = [{ x: 0.20, w: 0.34, h: 0.115 }, { x: 0.74, w: 0.42, h: 0.145 }];
+        const topOf = p => c.height * (GROUND_TOP + 0.015) - c.height * p.h * 0.35;
+
+        // Dunkles, erkaltetes Vulkangestein
         peaks.forEach(p => {
-            const cx = p.x * c.width, w = p.w * c.width, top = c.height * (GROUND_TOP + 0.015) - c.height * p.h * 0.35;
+            const cx = p.x * c.width, w = p.w * c.width, top = topOf(p);
             g.beginPath();
             g.moveTo(cx - w, c.height);
             g.lineTo(cx - w * 0.20, top);
             g.lineTo(cx + w * 0.20, top);
             g.lineTo(cx + w, c.height);
             g.closePath();
-            g.fillStyle = '#4a1a0c'; g.fill();
-            // Kantenlicht vom Lavaschein
+            const rock = g.createLinearGradient(0, top, 0, c.height);
+            rock.addColorStop(0, '#3d1409');
+            rock.addColorStop(1, '#1b0705');
+            g.fillStyle = rock; g.fill();
+            // Glühende Risse im Gestein
+            for (let i = 0; i < 4; i++) {
+                const sx = cx + (rnd() * 2 - 1) * w * 0.55;
+                g.beginPath(); g.moveTo(sx, top + 10 + rnd() * 30);
+                for (let k = 0; k < 3; k++) g.lineTo(sx + (rnd() * 2 - 1) * 18, top + 40 + k * 40 + rnd() * 25);
+                g.strokeStyle = 'rgba(255,90,25,0.5)'; g.lineWidth = 1.2;
+                g.shadowBlur = 6; g.shadowColor = '#ff5a00'; g.stroke(); g.shadowBlur = 0;
+            }
+            // Kraterschlund
             g.beginPath();
-            g.moveTo(cx - w, c.height); g.lineTo(cx - w * 0.20, top);
-            g.lineTo(cx + w * 0.20, top); g.lineTo(cx + w, c.height);
-            g.strokeStyle = 'rgba(255,140,60,0.45)'; g.lineWidth = 1.8; g.stroke();
-            // glühender Krater
-            g.beginPath();
-            g.moveTo(cx - w * 0.20, top); g.lineTo(cx + w * 0.20, top);
-            g.strokeStyle = 'rgba(255,190,90,0.95)'; g.lineWidth = 4;
-            g.shadowBlur = 20; g.shadowColor = '#ff6a10';
-            g.stroke(); g.shadowBlur = 0;
+            g.ellipse(cx, top + 2, w * 0.11, 3, 0, 0, Math.PI * 2);
+            g.fillStyle = '#ffb43a';
+            g.shadowBlur = 10; g.shadowColor = '#ff5a04';
+            g.fill(); g.shadowBlur = 0;
         });
 
-        // Lavaflüsse: geschwungene Ströme von den Kratern zum unteren Rand
+        // Lavaströme mit Temperaturverlauf: weißglühend am Krater, nach unten
+        // abkühlend über Gelb und Orange bis ins Dunkelrot
         peaks.forEach((p, pi) => {
-            const cx = p.x * c.width;
-            const top = c.height * (GROUND_TOP + 0.015) - c.height * p.h * 0.35;
+            const cx = p.x * c.width, top = topOf(p);
+            const hot = g.createLinearGradient(0, top, 0, c.height);
+            hot.addColorStop(0.00, '#ffe9a0');
+            hot.addColorStop(0.07, '#ffb02a');
+            hot.addColorStop(0.22, '#ff7208');
+            hot.addColorStop(0.50, '#d83506');
+            hot.addColorStop(0.78, '#a52104');
+            hot.addColorStop(1.00, '#7a1503');
+
             for (let s = 0; s < 2; s++) {
                 const dir = s === 0 ? -1 : 1;
-                g.beginPath();
-                g.moveTo(cx + dir * 4, top + 2);
-                g.bezierCurveTo(
-                    cx + dir * (26 + pi * 10), top + (c.height - top) * 0.35,
-                    cx + dir * (10 + s * 30), top + (c.height - top) * 0.65,
-                    cx + dir * (52 + pi * 18 + s * 12), c.height
-                );
-                g.strokeStyle = 'rgba(255,130,30,0.75)';
-                g.lineWidth = 5 - s;
-                g.lineCap = 'round';
-                g.shadowBlur = 14; g.shadowColor = '#ff5a00';
-                g.stroke();
-                g.strokeStyle = 'rgba(255,235,160,0.6)';
-                g.lineWidth = 1.6; g.shadowBlur = 6;
-                g.stroke();
+                const p0 = { x: cx + dir * 4, y: top + 2 };
+                const p1 = { x: cx + dir * (26 + pi * 10), y: top + (c.height - top) * 0.35 };
+                const p2 = { x: cx + dir * (10 + s * 30), y: top + (c.height - top) * 0.65 };
+                const p3 = { x: cx + dir * (52 + pi * 18 + s * 12), y: c.height };
+
+                const pts = [];
+                for (let t = 0; t <= 1.0001; t += 0.05) pts.push(bez(p0, p1, p2, p3, t));
+
+                // Breite: schmal am Schlund, weiter werdend beim Auslaufen
+                const baseW = 7 - s * 1.6;
+                const widthAt = t => baseW * (0.45 + t * 1.05) *
+                    (1 + Math.sin(t * 11 + s * 2 + pi) * 0.16);
+
+                // Weicher Hitzeschein, folgt der Stromform
+                for (let i = 0; i < pts.length - 1; i++) {
+                    const t = i / (pts.length - 1);
+                    g.beginPath();
+                    g.moveTo(pts[i].x, pts[i].y); g.lineTo(pts[i + 1].x, pts[i + 1].y);
+                    g.strokeStyle = 'rgba(255,95,15,0.13)';
+                    g.lineWidth = widthAt(t) * 3.2;
+                    g.lineCap = 'round';
+                    g.shadowBlur = 22; g.shadowColor = '#ff4a00';
+                    g.stroke();
+                }
                 g.shadowBlur = 0;
+
+                // Körper des Stroms mit Temperaturverlauf
+                for (let i = 0; i < pts.length - 1; i++) {
+                    const t = i / (pts.length - 1);
+                    g.beginPath();
+                    g.moveTo(pts[i].x, pts[i].y); g.lineTo(pts[i + 1].x, pts[i + 1].y);
+                    g.strokeStyle = hot;
+                    g.lineWidth = widthAt(t);
+                    g.lineCap = 'round';
+                    g.stroke();
+                }
+
+                // Erkaltete Krustenschollen, nach unten hin häufiger
+                for (let i = 3; i < pts.length - 1; i++) {
+                    const t = i / (pts.length - 1);
+                    if (rnd() > 0.25 + t * 0.5) continue;
+                    const pt = pts[i], ww = widthAt(t);
+                    g.beginPath();
+                    g.ellipse(pt.x + (rnd() * 2 - 1) * ww * 0.3, pt.y,
+                              ww * (0.22 + rnd() * 0.28), 1.2 + rnd() * 1.6,
+                              rnd() * Math.PI, 0, Math.PI * 2);
+                    g.fillStyle = 'rgba(38,11,6,0.78)';
+                    g.fill();
+                }
+
+                // Weißglühender Kern nur im obersten Abschnitt
+                const coreEnd = Math.floor(pts.length * 0.28);
+                for (let i = 0; i < coreEnd; i++) {
+                    const t = i / (pts.length - 1);
+                    g.beginPath();
+                    g.moveTo(pts[i].x, pts[i].y); g.lineTo(pts[i + 1].x, pts[i + 1].y);
+                    g.strokeStyle = 'rgba(255,240,190,' + (0.8 - i / coreEnd * 0.7) + ')';
+                    g.lineWidth = widthAt(t) * 0.38;
+                    g.lineCap = 'round';
+                    g.stroke();
+                }
             }
         });
+
+        // Lavasee am unteren Rand, in den die Ströme münden
+        const lake = g.createLinearGradient(0, c.height * 0.955, 0, c.height);
+        lake.addColorStop(0, 'rgba(120,26,6,0.75)');
+        lake.addColorStop(0.5, '#d33c08');
+        lake.addColorStop(1, '#ff8c1a');
+        g.fillStyle = lake;
+        g.beginPath();
+        g.moveTo(0, c.height);
+        for (let x = 0; x <= c.width; x += 10) {
+            g.lineTo(x, c.height * 0.968 + Math.sin(x / 34) * 5 + Math.sin(x / 11) * 2);
+        }
+        g.lineTo(c.width, c.height);
+        g.closePath(); g.fill();
+        // Krustenrisse im See
+        for (let i = 0; i < 14; i++) {
+            const x = rnd() * c.width, y = c.height * 0.975 + rnd() * (c.height * 0.02);
+            g.beginPath();
+            g.ellipse(x, y, 6 + rnd() * 16, 2 + rnd() * 3, 0, 0, Math.PI * 2);
+            g.fillStyle = 'rgba(40,12,6,0.66)'; g.fill();
+        }
     }
 };
 
