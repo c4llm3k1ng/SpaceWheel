@@ -158,6 +158,19 @@
             width: 38px; height: 38px; border-radius: 50%;
             font-size: 20px; cursor: pointer;
         }
+        .danger-btn {
+            background: #3a1116; border: 1px solid #7a2230; border-radius: 10px;
+            color: #ff6b7a; font-size: 13px; font-weight: bold;
+            padding: 8px 16px; cursor: pointer;
+        }
+        .danger-btn:active { background: #4d161d; }
+        .danger-btn:disabled { opacity: 0.5; cursor: default; }
+        #delete-account-modal {
+            display: none; position: fixed; inset: 0; z-index: 400;
+            background: rgba(10,10,15,0.88);
+            align-items: center; justify-content: center;
+        }
+        #delete-account-modal.active { display: flex; }
         #tutorial-ask {
             display: none; position: fixed; inset: 0; z-index: 400;
             background: rgba(10,10,15,0.85);
@@ -469,6 +482,35 @@
                 <div class="help-icon">💥</div>
                 <div style="flex:1;"><div class="help-name">Soundeffekte</div><div class="help-desc">Sounds für Items, Sprengungen und Kollisionen</div></div>
                 <button id="sfx-toggle-btn" class="tut-next" onclick="toggleSfx()" style="padding:8px 16px;font-size:13px;">An 🔊</button>
+            </div>
+        </div>
+
+        <div class="help-section" id="account-section" style="display:none;">
+            <div class="help-sec-title">Konto</div>
+            <div class="help-item" style="align-items:center;">
+                <div class="help-icon">👤</div>
+                <div style="flex:1;"><div class="help-name" id="account-name">–</div><div class="help-desc">Angemeldet</div></div>
+                <button class="ask-secondary" onclick="handleLogout()" style="padding:8px 16px;font-size:13px;">Abmelden</button>
+            </div>
+            <div class="help-item" style="align-items:center;">
+                <div class="help-icon">🗑️</div>
+                <div style="flex:1;"><div class="help-name">Konto löschen</div><div class="help-desc">Entfernt dein Konto und alle Daten endgültig</div></div>
+                <button class="danger-btn" onclick="openDeleteAccount()">Löschen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Konto löschen: Bestätigung -->
+    <div id="delete-account-modal">
+        <div class="ask-card">
+            <div class="tut-icon">🗑️</div>
+            <div class="tut-title">Konto endgültig löschen?</div>
+            <div class="tut-text" style="text-align:left;">Dauerhaft gelöscht werden dein Nutzername, dein Freundescode, dein Highscore sowie deine Freundesliste und offene Anfragen. Du verschwindest aus allen Bestenlisten.<br><br>Das lässt sich <b>nicht</b> rückgängig machen. Auch der lokale Highscore auf diesem Gerät wird zurückgesetzt.<br><br>Gib zur Bestätigung dein Passwort ein:</div>
+            <input class="auth-input" id="delete-pw" type="password" placeholder="Passwort" autocomplete="current-password" />
+            <div class="auth-error" id="delete-error"></div>
+            <div class="ask-buttons">
+                <button class="ask-secondary" onclick="closeDeleteAccount()">Abbrechen</button>
+                <button class="danger-btn" id="delete-confirm-btn" onclick="confirmDeleteAccount()">Endgültig löschen</button>
             </div>
         </div>
     </div>
@@ -2609,6 +2651,92 @@ function tutorialAskClose() {
     closeHamburger();
 }
 
+// ── Konto: Abmelden und Löschen ─────────────────────────────
+function updateAccountSection() {
+    const sec = document.getElementById('account-section');
+    if (fbUser && fbUserData) {
+        sec.style.display = '';
+        document.getElementById('account-name').textContent = fbUserData.username || '–';
+    } else {
+        sec.style.display = 'none';
+    }
+}
+
+async function handleLogout() {
+    try { await fbAuth.signOut(); } catch (e) {}
+    fbUser = null; fbUserData = null; isGuest = false;
+    resetGame();
+    showScreen('auth-screen');
+}
+
+function openDeleteAccount() {
+    document.getElementById('delete-pw').value = '';
+    document.getElementById('delete-error').textContent = '';
+    const btn = document.getElementById('delete-confirm-btn');
+    btn.disabled = false; btn.textContent = 'Endgültig löschen';
+    document.getElementById('delete-account-modal').classList.add('active');
+}
+
+function closeDeleteAccount() {
+    document.getElementById('delete-account-modal').classList.remove('active');
+}
+
+async function confirmDeleteAccount() {
+    const errEl = document.getElementById('delete-error');
+    const btn = document.getElementById('delete-confirm-btn');
+    const pw = document.getElementById('delete-pw').value;
+    errEl.textContent = '';
+    if (!pw) { errEl.textContent = 'Bitte Passwort eingeben'; return; }
+    if (!fbUser || !fbUserData) { errEl.textContent = 'Nicht angemeldet'; return; }
+    if (!navigator.onLine) { errEl.textContent = 'Keine Internetverbindung'; return; }
+
+    btn.disabled = true; btn.textContent = 'Wird gelöscht…';
+    const uid = fbUser.uid;
+    const uname = (fbUserData.username || '').toLowerCase();
+    const fcode = fbUserData.friendCode;
+    try {
+        // Firebase verlangt vor dem Löschen eine frische Anmeldung
+        const cred = firebase.auth.EmailAuthProvider.credential(uname + '@orbit-sync.app', pw);
+        await fbUser.reauthenticateWithCredential(cred);
+
+        // Eigene UID aus den Freundeslisten der Freunde entfernen
+        for (const fid of (fbUserData.friends || [])) {
+            await fbDb.collection('users').doc(fid).update({
+                friends: firebase.firestore.FieldValue.arrayRemove(uid)
+            }).catch(() => {});
+        }
+
+        // Eigene Dokumente löschen — noch angemeldet, sonst greifen die Regeln nicht
+        const batch = fbDb.batch();
+        batch.delete(fbDb.collection('users').doc(uid));
+        if (uname) batch.delete(fbDb.collection('usernames').doc(uname));
+        if (fcode) batch.delete(fbDb.collection('friendCodes').doc(fcode));
+        await batch.commit();
+
+        // Zuletzt das Auth-Konto
+        await fbUser.delete();
+
+        localStorage.removeItem('orbit_highscore_v46');
+        highscore = 0; highscoreEl.innerText = 0;
+        fbUser = null; fbUserData = null; isGuest = false;
+        closeDeleteAccount();
+        resetGame();
+        showScreen('auth-screen');
+    } catch (e) {
+        const code = e && e.code;
+        if (code === 'auth/wrong-password' || code === 'auth/invalid-credential' || code === 'auth/invalid-login-credentials') {
+            errEl.textContent = 'Falsches Passwort';
+        } else if (code === 'auth/too-many-requests') {
+            errEl.textContent = 'Zu viele Versuche. Bitte später erneut versuchen.';
+        } else if (code === 'permission-denied') {
+            errEl.textContent = 'Serverseitig abgelehnt — bitte Firestore-Regeln prüfen.';
+        } else {
+            errEl.textContent = 'Löschen fehlgeschlagen. Bitte erneut versuchen.';
+        }
+        btn.disabled = false; btn.textContent = 'Endgültig löschen';
+    }
+}
+
 // ── Welten-Testmodus ────────────────────────────────────────
 function openWorlds() {
     document.getElementById('worlds-list').innerHTML = WORLDS.map((w, i) =>
@@ -2640,6 +2768,7 @@ function openSettings() {
     document.getElementById('hamburger-btn').style.display = 'none';
     gamePaused = true;
     updateMusicToggleLabel();
+    updateAccountSection();
 }
 function closeSettings() {
     document.getElementById('settings-screen').classList.remove('active');
