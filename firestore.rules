@@ -1,0 +1,59 @@
+// Firestore-Sicherheitsregeln für Space Wheel
+// Diese Datei ist die Referenzfassung. Änderungen müssen zusätzlich in der
+// Firebase Console unter Firestore → Regeln eingefügt und veröffentlicht werden.
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /users/{uid} {
+      allow read: if request.auth != null;
+
+      // Eigenes Dokument: create, update und delete erlaubt
+      allow write: if request.auth != null && request.auth.uid == uid;
+
+      // Freundschaftsanfrage senden: es darf AUSSCHLIESSLICH die eigene uid
+      // angehängt werden — keine fremden IDs, keine Massen-Einträge
+      allow update: if request.auth != null && request.auth.uid != uid &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingRequests']) &&
+                       request.resource.data.pendingRequests ==
+                         resource.data.get('pendingRequests', []).concat([request.auth.uid]);
+
+      // Anfrage annehmen: nur die eigene uid darf zu friends dazukommen, und
+      // nur wenn diese Person tatsächlich bei mir angefragt hat
+      allow update: if request.auth != null && request.auth.uid != uid &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['friends']) &&
+                       request.resource.data.friends ==
+                         resource.data.get('friends', []).concat([request.auth.uid]) &&
+                       uid in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('pendingRequests', []);
+
+      // Konto löschen: sich selbst — und nur sich selbst — aus fremden
+      // Freundeslisten austragen
+      allow update: if request.auth != null && request.auth.uid != uid &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['friends']) &&
+                       request.resource.data.friends ==
+                         resource.data.get('friends', []).removeAll([request.auth.uid]);
+    }
+
+    // Namensreservierung: nur im Moment der Registrierung (solange noch kein
+    // eigenes users-Dokument existiert) und nur auf die eigene uid.
+    // Bestehende Einträge sind unveränderlich, da kein update erlaubt ist.
+    match /usernames/{username} {
+      allow read: if true;
+      allow create: if request.auth != null &&
+                       request.resource.data.keys().hasOnly(['uid']) &&
+                       request.resource.data.uid == request.auth.uid &&
+                       !exists(/databases/$(database)/documents/users/$(request.auth.uid));
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+
+    match /friendCodes/{code} {
+      allow read: if true;
+      allow create: if request.auth != null &&
+                       request.resource.data.keys().hasOnly(['uid']) &&
+                       request.resource.data.uid == request.auth.uid &&
+                       !exists(/databases/$(database)/documents/users/$(request.auth.uid));
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+  }
+}
