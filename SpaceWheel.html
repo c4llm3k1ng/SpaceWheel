@@ -688,19 +688,18 @@ const PALETTES = {
         symbols: false
     },
     deutan: {
-        label: 'Rot-Grün', hint: 'Blau, Rosa, Weiß und Orange \u2013 zusätzlich mit Symbolen',
+        label: 'Rot-Grün', hint: 'Blau, Rosa, Weiß und Orange',
         colors: ['#0072B2', '#CC79A7', '#FFFFFF', '#E69F00'],
         names:  ['Blau', 'Rosa', 'Weiß', 'Orange'],
-        // Im Symbolmodus zeigt der Marker das Symbol der Kugel statt einer Ersatzfarbe
-        dots:   ['\u25CF', '\u25B2', '\u25A0', '\u2715'],
-        symbols: true
+        dots:   ['\u{1F535}', '\u{1F7E3}', '\u26AA', '\u{1F7E0}'],
+        symbols: false
     },
     tritan: {
-        label: 'Blau-Gelb', hint: 'Rot, Grün, Weiß und Violett \u2013 zusätzlich mit Symbolen',
+        label: 'Blau-Gelb', hint: 'Rot, Grün, Weiß und Violett',
         colors: ['#ff3b30', '#2fd45a', '#FFFFFF', '#9a4cf0'],
         names:  ['Rot', 'Grün', 'Weiß', 'Violett'],
-        dots:   ['\u25CF', '\u25B2', '\u25A0', '\u2715'],
-        symbols: true
+        dots:   ['\u{1F534}', '\u{1F7E2}', '\u26AA', '\u{1F7E3}'],
+        symbols: false
     }
 };
 let paletteMode = localStorage.getItem('sw_palette') || 'normal';
@@ -727,7 +726,9 @@ function glyphInk(hex) {
     return (0.299 * r + 0.587 * g + 0.114 * b) > 0.55 ? 'rgba(0,0,0,0.78)' : 'rgba(255,255,255,0.92)';
 }
 
-// Symbol der Kugel i: 0 Punkt, 1 Dreieck, 2 Quadrat, 3 Kreuz
+// Symbol der Kugel i: 0 Punkt, 1 Dreieck, 2 Quadrat, 3 Kreuz.
+// Wird derzeit von keiner Palette genutzt (symbols: false ueberall) - liegt bereit
+// fuer einen moeglichen allgemeinen Farbenblind-Modus ohne eigene Farbwahl.
 function drawBallGlyph(g, i, x, y, r, ink) {
     const s = r * 0.62;
     g.save();
