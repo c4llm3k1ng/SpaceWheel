@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "io.github.c4llm3k1ng.spacewheel",
+      "sha256_cert_fingerprints": [
+        "3A:A6:AC:8E:9A:CD:75:92:44:47:A3:56:C4:11:08:21:9A:03:4F:65:C6:11:58:72:7A:10:B0:8F:A6:AE:C1:A1"
+      ]
+    }
+  }
+]
