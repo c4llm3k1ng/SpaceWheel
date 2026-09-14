@@ -173,12 +173,21 @@
             transition: opacity 0.5s; opacity: 0;
         }
         #offline-note.show { display: block; opacity: 1; }
-        #delete-account-modal {
+        #delete-account-modal, #score-sync-modal {
             display: none; position: fixed; inset: 0; z-index: 400;
             background: rgba(10,10,15,0.88);
             align-items: center; justify-content: center;
         }
-        #delete-account-modal.active { display: flex; }
+        #delete-account-modal.active, #score-sync-modal.active { display: flex; }
+        #score-offer {
+            display: none; position: fixed; left: 12px; right: 12px; bottom: 18px;
+            z-index: 270; background: #13141a; border: 1px solid #2a2b3d;
+            border-radius: 14px; padding: 16px 16px 14px;
+        }
+        #score-offer.show { display: block; }
+        .offer-title { font-size: 16px; font-weight: bold; color: #fff; margin-bottom: 6px; }
+        .offer-text { font-size: 13px; color: #999; line-height: 1.55; margin-bottom: 12px; }
+        .offer-row { display: flex; gap: 8px; justify-content: flex-end; }
         #tutorial-ask {
             display: none; position: fixed; inset: 0; z-index: 400;
             background: rgba(10,10,15,0.85);
@@ -337,6 +346,35 @@
 
     <!-- Offline-Hinweis -->
     <div id="offline-note"></div>
+
+    <!-- Angebot nach einem Gast-Highscore -->
+    <div id="score-offer">
+        <div class="offer-title">🏆 Neuer Highscore: <span id="offer-score">0</span></div>
+        <div class="offer-text">Du spielst ohne Konto — dieser Rekord liegt nur auf diesem Gerät.
+            Melde dich an, um ihn deinem Konto zuzuschreiben und in die Bestenliste zu kommen.
+            Du kannst das auch später in den Einstellungen nachholen.</div>
+        <div class="offer-row">
+            <button class="ask-secondary" onclick="hideScoreOffer()">Später</button>
+            <button class="tut-next" onclick="offerLogin()">Anmelden</button>
+        </div>
+    </div>
+
+    <!-- Rückfrage: Offline-Highscore diesem Konto zuschreiben? -->
+    <div id="score-sync-modal">
+        <div class="ask-card">
+            <div class="tut-icon">☁</div>
+            <div class="tut-title">Highscore übernehmen?</div>
+            <div class="tut-text" style="text-align:left;">Auf diesem Gerät wurde ohne Konto ein
+                Highscore von <b><span id="sync-score">0</span></b> erspielt.<br><br>
+                Gehört dieser Rekord zu deinem Konto <b><span id="sync-account">–</span></b>
+                (aktuell <span id="sync-current">0</span>)?<br><br>
+                Bei <b>Nein</b> fragen wir erst wieder, wenn erneut ohne Konto gespielt wurde.</div>
+            <div class="ask-buttons">
+                <button class="ask-secondary" onclick="guestSyncNo()">Nein</button>
+                <button class="tut-next" onclick="guestSyncYes()">Ja, übernehmen</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Tutorial-Frage beim ersten Spielen -->
     <div id="tutorial-ask">
@@ -513,6 +551,15 @@
             </div>
         </div>
 
+        <div class="help-section" id="guest-score-section" style="display:none;">
+            <div class="help-sec-title">Highscore sichern</div>
+            <div class="help-item" style="align-items:center;">
+                <div class="help-icon">🏆</div>
+                <div style="flex:1;"><div class="help-name"><span id="guest-score-value">0</span> Punkte ohne Konto</div><div class="help-desc">Nur auf diesem Gerät gespeichert</div></div>
+                <button class="tut-next" onclick="offerLogin()" style="padding:8px 16px;font-size:13px;">Anmelden</button>
+            </div>
+        </div>
+
         <div class="help-section">
             <div class="help-sec-title">Rechtliches</div>
             <a class="help-item" style="text-decoration:none;align-items:center;" href="privacy-de.html" target="_blank" rel="noopener">
@@ -564,7 +611,8 @@ const levelEl = document.getElementById('level-banner');
 
 let score = 0;
 const HS_KEY = 'orbit_highscore_v46';
-const HS_OWNER_KEY = 'sw_hs_owner'; // Konto, zu dem der lokale Highscore gehört
+const HS_OWNER_KEY = 'sw_hs_owner';       // Konto, zu dem der lokale Highscore gehört
+const HS_DECLINED_KEY = 'sw_hs_declined'; // abgelehnter Gast-Score, wird nicht erneut angeboten
 let highscore = localStorage.getItem(HS_KEY) || 0;
 highscoreEl.innerText = highscore;
 
@@ -641,16 +689,22 @@ window.addEventListener('keydown', (e) => {
     keys[e.code] = true;
     if (e.code === 'Space' && gameOver) {
         e.preventDefault();
-        resetGame();
+        if (!restartBlocked()) resetGame();
     }
 });
-window.addEventListener('click', () => { if (gameOver && !document.querySelector('.overlay-screen.active')) resetGame(); });
+// Neustart nur, wenn kein Overlay und kein offenes Angebot im Weg ist
+function restartBlocked() {
+    return !!document.querySelector('.overlay-screen.active')
+        || document.getElementById('score-offer').classList.contains('show')
+        || document.getElementById('score-sync-modal').classList.contains('active');
+}
+window.addEventListener('click', () => { if (gameOver && !restartBlocked()) resetGame(); });
 window.addEventListener('keyup', (e) => keys[e.code] = false);
 
 // TOUCH LOGIK
 canvas.addEventListener('touchstart', (e) => {
     if (gameOver) {
-        resetGame();
+        if (!restartBlocked()) resetGame();
         return;
     }
     const t = e.touches[0];
@@ -1528,6 +1582,12 @@ function triggerGameOver(cause) {
         localStorage.setItem(HS_OWNER_KEY, fbUser ? fbUser.uid : 'guest');
         highscoreEl.innerText = highscore;
         updateFirebaseHighscore(score);
+        if (!fbUser) {
+            // Ohne Konto erspielt: anbieten, den Rekord einem Konto zu sichern.
+            // Ein neuer Gast-Rekord hebt eine frühere Ablehnung wieder auf.
+            localStorage.removeItem(HS_DECLINED_KEY);
+            showScoreOffer(score);
+        }
     }
     for (let i = 0; i < 60; i++) {
         particles.push({
@@ -2691,11 +2751,22 @@ function tutorialAskClose() {
 // ── Konto: Abmelden und Löschen ─────────────────────────────
 function updateAccountSection() {
     const sec = document.getElementById('account-section');
+    const guestSec = document.getElementById('guest-score-section');
     if (fbUser && fbUserData) {
         sec.style.display = '';
         document.getElementById('account-name').textContent = fbUserData.username || '–';
+        guestSec.style.display = 'none';
     } else {
         sec.style.display = 'none';
+        // Ohne Konto: erspielten Highscore nachträglich sichern lassen
+        const localHs = parseInt(localStorage.getItem(HS_KEY) || 0);
+        const owner = localStorage.getItem(HS_OWNER_KEY);
+        if (localHs > 0 && owner === 'guest') {
+            guestSec.style.display = '';
+            document.getElementById('guest-score-value').textContent = localHs;
+        } else {
+            guestSec.style.display = 'none';
+        }
     }
 }
 
@@ -3413,24 +3484,79 @@ async function loadUserData(uid) {
     const serverHs = fbUserData.highscore || 0;
     const owner = localStorage.getItem(HS_OWNER_KEY);
 
-    // 'guest' = ohne Konto erspielt (z. B. offline). Dieser Stand darf dem
-    // Konto gutgeschrieben werden. Ein FREMDES Konto als Besitzer darf das
-    // nicht — sonst würde ein neues Konto den Score des anderen erben.
-    const mayAdopt = (owner === uid || owner === 'guest');
-    if (mayAdopt && localHs > serverHs) {
+    const declined = localStorage.getItem(HS_DECLINED_KEY);
+
+    if (owner === uid && localHs > serverHs) {
+        // Gleiches Konto, lokal weitergespielt (z. B. offline) → direkt hochladen
         await fbDb.collection('users').doc(uid).update({ highscore: localHs });
         fbUserData.highscore = localHs;
         highscore = localHs;
-        if (owner === 'guest') {
-            createFloatingText('☁ Highscore übernommen: ' + localHs, orbitX, orbitY - 110);
-        }
+        localStorage.setItem(HS_OWNER_KEY, uid);
+    } else if (owner === 'guest' && localHs > serverHs && declined !== String(localHs)) {
+        // Ohne Konto erspielt: NICHT automatisch übernehmen, sondern nachfragen.
+        // Bis zur Antwort bleiben lokaler Score und Besitzer unangetastet.
+        highscore = serverHs;
+        pendingGuestOffer = localHs;
     } else {
-        // Fremder oder unbekannter Besitzer → der Serverwert gilt
+        // Fremdes Konto, unbekannter Besitzer oder bereits abgelehnt
         highscore = serverHs;
         localStorage.setItem(HS_KEY, serverHs);
+        localStorage.setItem(HS_OWNER_KEY, uid);
     }
-    localStorage.setItem(HS_OWNER_KEY, uid);
     highscoreEl.innerText = highscore;
+}
+
+// ── Offline-Highscore einem Konto zuschreiben ───────────────
+let pendingGuestOffer = 0;
+
+function showScoreOffer(score) {
+    document.getElementById('offer-score').textContent = score;
+    document.getElementById('score-offer').classList.add('show');
+}
+function hideScoreOffer() {
+    document.getElementById('score-offer').classList.remove('show');
+}
+function offerLogin() {
+    hideScoreOffer();
+    isGuest = false;
+    switchAuthTab('login');
+    showScreen('auth-screen');
+}
+
+function showGuestSyncAsk() {
+    if (!pendingGuestOffer || !fbUser || !fbUserData) return;
+    document.getElementById('sync-score').textContent = pendingGuestOffer;
+    document.getElementById('sync-account').textContent = fbUserData.username || '–';
+    document.getElementById('sync-current').textContent = fbUserData.highscore || 0;
+    document.getElementById('score-sync-modal').classList.add('active');
+}
+
+async function guestSyncYes() {
+    const score = pendingGuestOffer;
+    pendingGuestOffer = 0;
+    document.getElementById('score-sync-modal').classList.remove('active');
+    if (!fbUser || !score) return;
+    try {
+        await fbDb.collection('users').doc(fbUser.uid).update({ highscore: score });
+        if (fbUserData) fbUserData.highscore = score;
+        highscore = score;
+        highscoreEl.innerText = score;
+        localStorage.setItem(HS_KEY, score);
+        localStorage.setItem(HS_OWNER_KEY, fbUser.uid);
+        localStorage.removeItem(HS_DECLINED_KEY);
+        createFloatingText('☁ Highscore übernommen: ' + score, orbitX, orbitY - 110);
+    } catch (e) {
+        showOfflineNote('Der Highscore konnte nicht übertragen werden. '
+            + 'Beim nächsten Anmelden fragen wir erneut.');
+    }
+}
+
+function guestSyncNo() {
+    // Abgelehnt: nicht erneut fragen, bis wieder offline gespielt wurde.
+    // Der lokale Score bleibt erhalten und geht nicht verloren.
+    localStorage.setItem(HS_DECLINED_KEY, String(pendingGuestOffer));
+    pendingGuestOffer = 0;
+    document.getElementById('score-sync-modal').classList.remove('active');
 }
 
 // Nachträglicher Abgleich, sobald wieder eine Verbindung besteht — damit ein
@@ -3443,12 +3569,13 @@ async function trySyncHighscore() {
             updateAccountSection();
             return;
         }
+        // Nur den eigenen Stand automatisch nachreichen. Gast-Scores werden
+        // ausschließlich nach Rückfrage übernommen (siehe showGuestSyncAsk).
         const localHs = parseInt(localStorage.getItem(HS_KEY) || 0);
         const owner = localStorage.getItem(HS_OWNER_KEY);
-        if ((owner === fbUser.uid || owner === 'guest') && localHs > (fbUserData.highscore || 0)) {
+        if (owner === fbUser.uid && localHs > (fbUserData.highscore || 0)) {
             await fbDb.collection('users').doc(fbUser.uid).update({ highscore: localHs });
             fbUserData.highscore = localHs;
-            localStorage.setItem(HS_OWNER_KEY, fbUser.uid);
             createFloatingText('☁ Highscore synchronisiert', orbitX, orbitY - 110);
         }
     } catch (e) {
@@ -3722,6 +3849,8 @@ fbAuth.onAuthStateChanged(async (user) => {
             showOfflineNote('📡 <b>Offline</b> — du bist angemeldet, aber ohne Verbindung. '
                 + 'Dein Highscore wird auf dem Gerät gespeichert und automatisch mit deinem '
                 + 'Konto abgeglichen, sobald du wieder online bist.');
+        } else {
+            showGuestSyncAsk();
         }
     } else {
         fbUser = null;
