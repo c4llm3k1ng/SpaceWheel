@@ -1,9 +1,11 @@
 {
+    "id": "/SpaceWheel/",
     "name": "Space Wheel",
     "short_name": "Space Wheel",
     "description": "Drehe das Rad und führe die Kugeln durch die Lücken!",
     "lang": "de",
     "start_url": "./SpaceWheel.html",
+    "scope": "./",
     "display": "standalone",
     "background_color": "#0a0a0f",
     "theme_color": "#0a0a0f",
@@ -33,6 +35,29 @@
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "maskable"
+        }
+    ],
+    "screenshots": [
+        {
+            "src": "store/screenshots/s1-space.png",
+            "sizes": "1080x1920",
+            "type": "image/png",
+            "form_factor": "narrow",
+            "label": "Führe die Kugeln durch die Lücken"
+        },
+        {
+            "src": "store/screenshots/s5-gas.png",
+            "sizes": "1080x1920",
+            "type": "image/png",
+            "form_factor": "narrow",
+            "label": "Vier Farben gleichzeitig im Blick"
+        },
+        {
+            "src": "store/screenshots/s6-volcano.png",
+            "sizes": "1080x1920",
+            "type": "image/png",
+            "form_factor": "narrow",
+            "label": "Sechs Welten mit steigendem Score"
         }
     ]
 }
