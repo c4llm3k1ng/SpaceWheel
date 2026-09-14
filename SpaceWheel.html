@@ -289,6 +289,9 @@
             <button class="ham-item" onclick="closeHamburger(); openLeaderboard()">
                 <span class="ham-icon">🏆</span> Bestenliste
             </button>
+            <button class="ham-item" onclick="closeHamburger(); openFriends()">
+                <span class="ham-icon">👥</span> Freunde
+            </button>
             <button class="ham-item" onclick="closeHamburger(); startTutorial()">
                 <span class="ham-icon">📖</span> Tutorial
             </button>
@@ -529,7 +532,9 @@ const highscoreEl = document.getElementById('highscore');
 const levelEl = document.getElementById('level-banner');
 
 let score = 0;
-let highscore = localStorage.getItem('orbit_highscore_v46') || 0;
+const HS_KEY = 'orbit_highscore_v46';
+const HS_OWNER_KEY = 'sw_hs_owner'; // Konto, zu dem der lokale Highscore gehört
+let highscore = localStorage.getItem(HS_KEY) || 0;
 highscoreEl.innerText = highscore;
 
 let gameOver = false;
@@ -1488,7 +1493,8 @@ function triggerGameOver(cause) {
     gameOver = true; isDragging = false;
     if (score > highscore) {
         highscore = score;
-        localStorage.setItem('orbit_highscore_v46', highscore);
+        localStorage.setItem(HS_KEY, highscore);
+        localStorage.setItem(HS_OWNER_KEY, fbUser ? fbUser.uid : 'guest');
         highscoreEl.innerText = highscore;
         updateFirebaseHighscore(score);
     }
@@ -2665,6 +2671,10 @@ function updateAccountSection() {
 async function handleLogout() {
     try { await fbAuth.signOut(); } catch (e) {}
     fbUser = null; fbUserData = null; isGuest = false;
+    // Lokalen Highscore freigeben — er gehörte dem abgemeldeten Konto
+    localStorage.removeItem(HS_KEY);
+    localStorage.removeItem(HS_OWNER_KEY);
+    highscore = 0; highscoreEl.innerText = 0;
     resetGame();
     showScreen('auth-screen');
 }
@@ -2716,7 +2726,8 @@ async function confirmDeleteAccount() {
         // Zuletzt das Auth-Konto
         await fbUser.delete();
 
-        localStorage.removeItem('orbit_highscore_v46');
+        localStorage.removeItem(HS_KEY);
+        localStorage.removeItem(HS_OWNER_KEY);
         highscore = 0; highscoreEl.innerText = 0;
         fbUser = null; fbUserData = null; isGuest = false;
         closeDeleteAccount();
@@ -3363,15 +3374,26 @@ async function loadUserData(uid) {
     const doc = await fbDb.collection('users').doc(uid).get();
     if (!doc.exists) return;
     fbUserData = doc.data();
-    const localHs = parseInt(localStorage.getItem('orbit_highscore_v46') || 0);
-    if (localHs > (fbUserData.highscore || 0)) {
+
+    // Der lokale Highscore gehört immer genau einem Konto. Nur wenn er zu
+    // DIESEM Konto gehört, darf er nach oben synchronisiert werden — sonst
+    // würde ein neues Konto auf demselben Gerät den Score erben.
+    const localHs = parseInt(localStorage.getItem(HS_KEY) || 0);
+    const serverHs = fbUserData.highscore || 0;
+    const owner = localStorage.getItem(HS_OWNER_KEY);
+
+    if (owner === uid && localHs > serverHs) {
+        // Gleiches Konto, lokal weitergespielt (z. B. offline) → hochladen
         await fbDb.collection('users').doc(uid).update({ highscore: localHs });
         fbUserData.highscore = localHs;
-    } else if (fbUserData.highscore > localHs) {
-        highscore = fbUserData.highscore;
-        localStorage.setItem('orbit_highscore_v46', highscore);
-        highscoreEl.innerText = highscore;
+        highscore = localHs;
+    } else {
+        // Fremder oder unbekannter Besitzer → der Serverwert gilt
+        highscore = serverHs;
+        localStorage.setItem(HS_KEY, serverHs);
     }
+    localStorage.setItem(HS_OWNER_KEY, uid);
+    highscoreEl.innerText = highscore;
 }
 
 async function updateFirebaseHighscore(newScore) {
@@ -3392,12 +3414,26 @@ async function openLeaderboard() {
     showScreen('leaderboard-screen');
     document.getElementById('lb-tab-global').classList.add('active');
     document.getElementById('lb-tab-friends').classList.remove('active');
-    document.getElementById('lb-add-friend-btn').style.display = fbUser ? 'block' : 'none';
+    // Der Hinzufügen-Knopf gehört ausschließlich in den Freunde-Reiter
+    document.getElementById('lb-add-friend-btn').style.display = 'none';
     if (fbUser && fbUserData) {
         document.getElementById('my-friend-code').style.display = 'block';
         document.getElementById('my-code-text').textContent = fbUserData.friendCode || '------';
     }
     await renderLeaderboard('global');
+}
+
+// Direkt in den Freunde-Bereich springen (eigener Menüpunkt)
+async function openFriends() {
+    showScreen('leaderboard-screen');
+    document.getElementById('lb-tab-global').classList.remove('active');
+    document.getElementById('lb-tab-friends').classList.add('active');
+    document.getElementById('lb-add-friend-btn').style.display = fbUser ? 'block' : 'none';
+    if (fbUser && fbUserData) {
+        document.getElementById('my-friend-code').style.display = 'block';
+        document.getElementById('my-code-text').textContent = fbUserData.friendCode || '------';
+    }
+    await renderLeaderboard('friends');
 }
 
 function closeLeaderboard() { showScreen(null); openHamburger(); }
@@ -3547,10 +3583,22 @@ async function handleAddFriend() {
         }
         if (!targetUid) throw new Error('Nicht gefunden');
         if (targetUid === fbUser.uid) throw new Error('Du kannst dich nicht selbst hinzufügen');
-        if ((fbUserData.friends||[]).includes(targetUid)) throw new Error('Bereits in deiner Freundesliste');
 
-        // Cross-request: they already sent us a request → auto-accept
-        if ((fbUserData.pendingRequests||[]).includes(targetUid)) {
+        // Eigenen Stand frisch vom Server laden. Die lokale Kopie kann veraltet
+        // sein (z. B. parallel auf einem anderen Gerät gespielt), und die
+        // Sicherheitsregeln prüfen gegen den Serverstand — nicht gegen den Cache.
+        const meSnap = await fbDb.collection('users').doc(fbUser.uid).get();
+        const myData = meSnap.exists ? meSnap.data() : {};
+        const myFriends = myData.friends || [];
+        const myPending = myData.pendingRequests || [];
+        if (fbUserData) {
+            fbUserData.friends = myFriends;
+            fbUserData.pendingRequests = myPending;
+        }
+        if (myFriends.includes(targetUid)) throw new Error('Bereits in deiner Freundesliste');
+
+        // Gegenanfrage liegt vor → direkt annehmen
+        if (myPending.includes(targetUid)) {
             await acceptFriendRequest(targetUid);
             errEl.style.color = '#00d68f';
             errEl.textContent = 'Freund hinzugefügt!';
@@ -3561,8 +3609,11 @@ async function handleAddFriend() {
         // Check if we already sent a request
         const targetDoc = await fbDb.collection('users').doc(targetUid).get();
         if (!targetDoc.exists) throw new Error('Nicht gefunden');
-        if ((targetDoc.data().pendingRequests||[]).includes(fbUser.uid))
+        const targetData = targetDoc.data();
+        if ((targetData.pendingRequests||[]).includes(fbUser.uid))
             throw new Error('Anfrage bereits gesendet');
+        if ((targetData.friends||[]).includes(fbUser.uid))
+            throw new Error('Bereits in deiner Freundesliste');
 
         // Send request: add our uid to their pendingRequests
         await fbDb.collection('users').doc(targetUid).update({
