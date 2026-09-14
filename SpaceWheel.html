@@ -50,6 +50,9 @@
             color: #ffcc00;
             font-size: 16px;
             margin-top: 5px;
+            min-height: 19px;          /* Platz bleibt frei, nichts springt */
+            opacity: 0;
+            transition: opacity 0.45s ease;
         }
         .bonus-text {
             position: absolute;
@@ -617,6 +620,18 @@ const ctx = canvas.getContext('2d');
 const scoreEl = document.getElementById('score');
 const highscoreEl = document.getElementById('highscore');
 const levelEl = document.getElementById('level-banner');
+// Stufenmeldungen ploppen nur kurz auf; Item-Anzeigen bleiben, solange das Item laeuft
+const LEVEL_BANNER_ZEIT = 2.5;
+let levelBannerTimer = 0;
+let letzterStufenName = '';
+let bannerInhalt = '';
+function zeigeBanner(text, farbe) {
+    if (!levelEl) return;
+    if (!text) { levelEl.style.opacity = '0'; bannerInhalt = ''; return; }
+    if (text !== bannerInhalt) { levelEl.innerText = text; bannerInhalt = text; }
+    if (farbe) levelEl.style.color = farbe;
+    levelEl.style.opacity = '1';
+}
 
 let score = 0;
 const HS_KEY = 'orbit_highscore_v46';
@@ -780,8 +795,7 @@ function applyPalette(mode) {
     if (typeof clearShooterColor !== 'undefined' && clearShooterColor) clearShooterColor = remap(clearShooterColor);
     if (typeof tutorialFirstColor !== 'undefined' && tutorialFirstColor) tutorialFirstColor = remap(tutorialFirstColor);
 }
-// Startbeschriftung des Stufen-Banners in der aktiven Palette
-if (levelEl) levelEl.innerText = getLevelSettings(0).name;
+// Das Banner startet leer - es erscheint erst beim Stufenwechsel.
 
 const TYPE_DUAL_GAP = 'DUAL_GAP';
 const TYPE_TRIPLE_GAP = 'TRIPLE_GAP';
@@ -851,8 +865,9 @@ canvas.addEventListener('touchcancel', () => { isDragging = false; });
 function resetGame() {
     score = 0;
     scoreEl.innerText = score;
-    levelEl.innerText = getLevelSettings(0).name;
-    levelEl.style.color = COLOR_PINK;
+    letzterStufenName = getLevelSettings(0).name;
+    levelBannerTimer = LEVEL_BANNER_ZEIT;
+    zeigeBanner(letzterStufenName, COLOR_PINK);
     obstacles = [];
     items = [];
     particles = [];
@@ -942,21 +957,26 @@ function update() {
         spawnTimer = 0;
     }
 
+    if (settings.name !== letzterStufenName) {
+        letzterStufenName = settings.name;
+        levelBannerTimer = LEVEL_BANNER_ZEIT;
+    }
+    const itemAnzeige = starPowerTimer > 0 || slowMotionTimer > 0 || wideGapTimer > 0
+        || clearCharges > 0 || projectiles.length > 0;
+    // Nur herunterzaehlen, wenn die Meldung auch sichtbar ist
+    if (!itemAnzeige && levelBannerTimer > 0) levelBannerTimer = Math.max(0, levelBannerTimer - dt);
     if (starPowerTimer > 0) {
-        levelEl.innerText = '🌟 IMMUNITY AKTIV';
-        levelEl.style.color = COLOR_YELLOW;
+        zeigeBanner('🌟 IMMUNITY AKTIV', COLOR_YELLOW);
     } else if (slowMotionTimer > 0) {
-        levelEl.innerText = '⏳ ZEITLUPE AKTIV';
-        levelEl.style.color = COLOR_CYAN;
+        zeigeBanner('⏳ ZEITLUPE AKTIV', COLOR_CYAN);
     } else if (clearCharges > 0 || projectiles.length > 0) {
-        levelEl.innerText = '💥 SPRENGUNG: noch ' + (clearCharges + projectiles.length) + ' Balken';
-        levelEl.style.color = '#ff3300';
+        zeigeBanner('💥 SPRENGUNG: noch ' + (clearCharges + projectiles.length) + ' Balken', '#ff3300');
     } else if (wideGapTimer > 0) {
-        levelEl.innerText = '↔ BREITE LÜCKEN AKTIV';
-        levelEl.style.color = COLOR_PURPLE;
+        zeigeBanner('↔ BREITE LÜCKEN AKTIV', COLOR_PURPLE);
+    } else if (levelBannerTimer > 0) {
+        zeigeBanner(settings.name, settings.color);
     } else {
-        levelEl.innerText = settings.name;
-        levelEl.style.color = settings.color;
+        zeigeBanner(null);
     }
 
     if (isDragging) {
@@ -1677,6 +1697,7 @@ function triggerJuiceEffect(color) {
 
 function triggerGameOver(cause) {
     playSfx(cause === 'bomb' ? 'bomb' : 'crash');
+    zeigeBanner(null);   // Meldung nicht ueber dem Game-Over-Bild stehen lassen
     if (tutorialTestActive) {
         // Im Tutorial-Test kein echtes Game Over: Feld leeren und weiterprobieren
         obstacles = []; items = [];
@@ -3063,7 +3084,7 @@ function choosePalette(mode) {
     applyPalette(mode);
     renderPaletteUI();
     renderHelpBalls();
-    if (levelEl) levelEl.innerText = getLevelSettings(gameOver ? 0 : score).name;
+    letzterStufenName = '';   // laesst die Meldung in der neuen Palette kurz erscheinen
     const tutOffen = document.getElementById('tutorial-overlay');
     if (tutOffen && tutOffen.classList.contains('active')) renderTutorialSlide();
 }
