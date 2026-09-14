@@ -211,9 +211,10 @@
 
         .palette-row { display: flex; gap: 6px; }
         .palette-btn {
-            flex: 1; padding: 9px 4px; border-radius: 8px; cursor: pointer;
+            flex: 1; padding: 9px 3px; border-radius: 8px; cursor: pointer;
             background: #1b1c26; border: 1px solid #2a2b3d; color: #9aa0b5;
-            font-size: 12px; font-weight: bold;
+            font-size: 11px; font-weight: bold; line-height: 1.25;
+            white-space: normal; word-break: break-word;
         }
         .palette-btn.active { background: #ff007f; border-color: #ff007f; color: #fff; }
         .palette-preview { display: flex; gap: 10px; align-items: center; margin-top: 12px; }
@@ -537,9 +538,9 @@
                 <div class="help-name" style="margin-bottom:4px;">Farbmodus</div>
                 <div class="help-desc" id="palette-hint" style="margin-bottom:10px;">–</div>
                 <div class="palette-row">
-                    <button class="palette-btn" data-palette="normal" onclick="choosePalette('normal')">Normal</button>
-                    <button class="palette-btn" data-palette="deutan" onclick="choosePalette('deutan')">Rot-Grün</button>
-                    <button class="palette-btn" data-palette="tritan" onclick="choosePalette('tritan')">Blau-Gelb</button>
+                    <button class="palette-btn" data-palette="normal" onclick="choosePalette('normal')">Normalsicht</button>
+                    <button class="palette-btn" data-palette="deutan" onclick="choosePalette('deutan')">Rot-Grün-Blindheit</button>
+                    <button class="palette-btn" data-palette="tritan" onclick="choosePalette('tritan')">Blau-Gelb-Blindheit</button>
                 </div>
                 <div class="palette-preview" id="palette-preview"></div>
             </div>
@@ -681,21 +682,21 @@ let startOrbitAngle = 0;
 // Die vier Eintraege sind immer dieselben Kugel-Plaetze (0..3), nur anders gefaerbt.
 const PALETTES = {
     normal: {
-        label: 'Normal', hint: 'Pink, Cyan, Gelb und Lila',
+        label: 'Normalsicht', hint: 'Kugelfarben: Pink, Cyan, Gelb und Lila',
         colors: ['#ff007f', '#00f2fe', '#ffcc00', '#aa00ff'],
         names:  ['Pink', 'Cyan', 'Gelb', 'Lila'],
         dots:   ['\u{1F534}', '\u{1F535}', '\u{1F7E1}', '\u{1F7E3}'],
         symbols: false
     },
     deutan: {
-        label: 'Rot-Grün', hint: 'Blau, Rosa, Weiß und Orange',
+        label: 'Rot-Grün-Blindheit', hint: 'Kugelfarben: Blau, Rosa, Weiß und Orange',
         colors: ['#0072B2', '#CC79A7', '#FFFFFF', '#E69F00'],
         names:  ['Blau', 'Rosa', 'Weiß', 'Orange'],
         dots:   ['\u{1F535}', '\u{1F7E3}', '\u26AA', '\u{1F7E0}'],
         symbols: false
     },
     tritan: {
-        label: 'Blau-Gelb', hint: 'Rot, Grün, Weiß und Violett',
+        label: 'Blau-Gelb-Blindheit', hint: 'Kugelfarben: Rot, Grün, Weiß und Violett',
         colors: ['#ff3b30', '#2fd45a', '#FFFFFF', '#9a4cf0'],
         names:  ['Rot', 'Grün', 'Weiß', 'Violett'],
         dots:   ['\u{1F534}', '\u{1F7E2}', '\u26AA', '\u{1F7E3}'],
