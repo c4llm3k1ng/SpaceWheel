@@ -1,4 +1,4 @@
-const CACHE = 'orbit-sync-v66';
+const CACHE = 'orbit-sync-v67';
 const STATIC_ASSETS = [
     './manifest.json',
     './icon-192.png',
@@ -6,8 +6,26 @@ const STATIC_ASSETS = [
     './apple-touch-icon.png'
 ];
 
+// Firebase-SDK mitspeichern, damit eine bestehende Anmeldung auch ohne
+// Verbindung wiederhergestellt werden kann. Die Skripte werden mit
+// crossorigin="anonymous" geladen, liefern also normale (nicht opake)
+// Antworten und lassen sich dadurch zuverlässig ablegen und prüfen.
+const CDN_ASSETS = [
+    'https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js',
+    'https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js',
+    'https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js'
+];
+
 self.addEventListener('install', e => {
-    e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC_ASSETS)));
+    e.waitUntil((async () => {
+        const c = await caches.open(CACHE);
+        // Einzeln ablegen: ein fehlgeschlagener Download darf die Installation
+        // des Service Workers nicht verhindern (addAll schlägt sonst komplett fehl)
+        await Promise.all(STATIC_ASSETS.map(u => c.add(u).catch(() => {})));
+        await Promise.all(CDN_ASSETS.map(u =>
+            c.add(new Request(u, { mode: 'cors' })).catch(() => {})
+        ));
+    })());
     self.skipWaiting();
 });
 
@@ -44,9 +62,9 @@ self.addEventListener('fetch', e => {
     // nachcachen — nötig, damit das Spiel offline überhaupt startet
     if (url.hostname.endsWith('gstatic.com')) {
         e.respondWith(
-            caches.match(e.request).then(r => r || fetch(e.request).then(resp => {
+            caches.match(e.request, { ignoreVary: true }).then(r => r || fetch(e.request).then(resp => {
                 const clone = resp.clone();
-                caches.open(CACHE).then(c => c.put(e.request, clone));
+                caches.open(CACHE).then(c => c.put(e.request, clone)).catch(() => {});
                 return resp;
             }))
         );
