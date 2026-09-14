@@ -209,6 +209,15 @@
             border-radius: 999px; padding: 10px 20px; font-size: 14px; font-weight: bold; cursor: pointer;
         }
 
+        .palette-row { display: flex; gap: 6px; }
+        .palette-btn {
+            flex: 1; padding: 9px 4px; border-radius: 8px; cursor: pointer;
+            background: #1b1c26; border: 1px solid #2a2b3d; color: #9aa0b5;
+            font-size: 12px; font-weight: bold;
+        }
+        .palette-btn.active { background: #ff007f; border-color: #ff007f; color: #fff; }
+        .palette-preview { display: flex; gap: 10px; align-items: center; margin-top: 12px; }
+
         #help-screen, #settings-screen, #worlds-screen {
             display: none; position: fixed; inset: 0; z-index: 300;
             background: #0a0a0f; flex-direction: column; align-items: center;
@@ -410,22 +419,7 @@
 
         <div class="help-section">
             <div class="help-sec-title">Kugeln</div>
-            <div class="help-item">
-                <div class="help-icon" style="color:#ff007f;">●</div>
-                <div><div class="help-name">Pink – immer aktiv</div><div class="help-desc">Deine erste Kugel, von Anfang an dabei.</div></div>
-            </div>
-            <div class="help-item">
-                <div class="help-icon" style="color:#00f2fe;">●</div>
-                <div><div class="help-name">Cyan – ab Score 12</div><div class="help-desc">Zweite Kugel, gegenüberliegend von Pink.</div></div>
-            </div>
-            <div class="help-item">
-                <div class="help-icon" style="color:#ffe600;">●</div>
-                <div><div class="help-name">Gelb – ab Score 51</div><div class="help-desc">Dritte Kugel, erscheint zwischen Pink und Cyan.</div></div>
-            </div>
-            <div class="help-item">
-                <div class="help-icon" style="color:#cc44ff;">●</div>
-                <div><div class="help-name">Lila – ab Score 125</div><div class="help-desc">Vierte Kugel, schließt das Rad.</div></div>
-            </div>
+            <div id="help-balls"></div>
         </div>
 
         <div class="help-section">
@@ -476,7 +470,7 @@
             </div>
             <div class="help-item">
                 <div class="help-icon">🔀</div>
-                <div><div class="help-name">Farbtausch (ab Score 155)</div><div class="help-desc">Gegenüberliegende Kugeln tauschen sofort die Plätze: Pink ⇄ Cyan und Gelb ⇄ Lila. Schnell umdenken!</div></div>
+                <div><div class="help-name">Farbtausch (ab Score 155)</div><div class="help-desc" id="help-swap-desc">Gegenüberliegende Kugeln tauschen sofort die Plätze.</div></div>
             </div>
         </div>
 
@@ -534,6 +528,20 @@
                 <div class="help-icon">💥</div>
                 <div style="flex:1;"><div class="help-name">Soundeffekte</div><div class="help-desc">Sounds für Items, Sprengungen und Kollisionen</div></div>
                 <button id="sfx-toggle-btn" class="tut-next" onclick="toggleSfx()" style="padding:8px 16px;font-size:13px;">An 🔊</button>
+            </div>
+        </div>
+
+        <div class="help-section">
+            <div class="help-sec-title">Farben</div>
+            <div class="help-item" style="display:block;">
+                <div class="help-name" style="margin-bottom:4px;">Farbmodus</div>
+                <div class="help-desc" id="palette-hint" style="margin-bottom:10px;">–</div>
+                <div class="palette-row">
+                    <button class="palette-btn" data-palette="normal" onclick="choosePalette('normal')">Normal</button>
+                    <button class="palette-btn" data-palette="deutan" onclick="choosePalette('deutan')">Rot-Grün</button>
+                    <button class="palette-btn" data-palette="tritan" onclick="choosePalette('tritan')">Blau-Gelb</button>
+                </div>
+                <div class="palette-preview" id="palette-preview"></div>
             </div>
         </div>
 
@@ -598,7 +606,7 @@
 
     <div id="ui-layer">
         <span id="score-line">Score: <span id="score">0</span><span id="highscore-part"> | Highscore: <span id="highscore">0</span></span></span>
-        <div id="level-banner">Stufe 1: Tutorial (Roter Fokus) 🔴</div>
+        <div id="level-banner"></div>
     </div>
     <canvas id="gameCanvas" width="450" height="800"></canvas>
 
@@ -669,11 +677,109 @@ let isDragging = false;
 let startTouchAngle = 0;
 let startOrbitAngle = 0;
 
-const COLOR_PINK = '#ff007f';   
-const COLOR_CYAN = '#00f2fe';   
-const COLOR_YELLOW = '#ffcc00'; 
-const COLOR_PURPLE = '#aa00ff';
+// --- Farbpaletten: Normalsicht plus zwei Modi fuer Farbfehlsichtigkeit ---
+// Die vier Eintraege sind immer dieselben Kugel-Plaetze (0..3), nur anders gefaerbt.
+const PALETTES = {
+    normal: {
+        label: 'Normal', hint: 'Pink, Cyan, Gelb und Lila',
+        colors: ['#ff007f', '#00f2fe', '#ffcc00', '#aa00ff'],
+        names:  ['Pink', 'Cyan', 'Gelb', 'Lila'],
+        dots:   ['\u{1F534}', '\u{1F535}', '\u{1F7E1}', '\u{1F7E3}'],
+        symbols: false
+    },
+    deutan: {
+        label: 'Rot-Grün', hint: 'Weiß, Blau, Gelb und Hellblau \u2013 zusätzlich mit Symbolen',
+        colors: ['#f2f2f2', '#2f6bff', '#ffd400', '#79dcff'],
+        names:  ['Weiß', 'Blau', 'Gelb', 'Hellblau'],
+        dots:   ['\u26AA', '\u{1F535}', '\u{1F7E1}', '\u{1F537}'],
+        symbols: true
+    },
+    tritan: {
+        label: 'Blau-Gelb', hint: 'Rot, Grün, Weiß und Grau \u2013 zusätzlich mit Symbolen',
+        colors: ['#ff2d2d', '#22d65a', '#f2f2f2', '#9aa0a6'],
+        names:  ['Rot', 'Grün', 'Weiß', 'Grau'],
+        dots:   ['\u{1F534}', '\u{1F7E2}', '\u26AA', '\u2B1C'],
+        symbols: true
+    }
+};
+let paletteMode = localStorage.getItem('sw_palette') || 'normal';
+if (!PALETTES[paletteMode]) paletteMode = 'normal';
+let palette = PALETTES[paletteMode];
+
+// Identitaets-Plaetze: die Namen bleiben, die Farbwerte wechseln mit der Palette
+let COLOR_PINK   = palette.colors[0]; // Kugel 1 - von Anfang an
+let COLOR_CYAN   = palette.colors[1]; // Kugel 2 - ab Score 12
+let COLOR_YELLOW = palette.colors[2]; // Kugel 3 - ab Score 51
+let COLOR_PURPLE = palette.colors[3]; // Kugel 4 - ab Score 125
 const COLOR_RAINBOW = 'RAINBOW';
+
+function ballColor(i) { return palette.colors[i]; }
+function ballName(i)  { return palette.names[i]; }
+function ballDot(i)   { return palette.dots[i]; }
+function ballIndex(c) { return palette.colors.indexOf(c); }
+
+// Dunkle oder helle Tinte fuer das Symbol, je nach Helligkeit der Kugel
+function glyphInk(hex) {
+    const r = parseInt(hex.slice(1, 3), 16) / 255;
+    const g = parseInt(hex.slice(3, 5), 16) / 255;
+    const b = parseInt(hex.slice(5, 7), 16) / 255;
+    return (0.299 * r + 0.587 * g + 0.114 * b) > 0.55 ? 'rgba(0,0,0,0.78)' : 'rgba(255,255,255,0.92)';
+}
+
+// Symbol der Kugel i: 0 Punkt, 1 Dreieck, 2 Quadrat, 3 Kreuz
+function drawBallGlyph(g, i, x, y, r, ink) {
+    const s = r * 0.62;
+    g.save();
+    g.translate(x, y);
+    g.fillStyle = ink;
+    g.strokeStyle = ink;
+    g.lineWidth = Math.max(1.6, r * 0.24);
+    g.lineCap = 'round';
+    g.beginPath();
+    if (i === 0) {
+        g.arc(0, 0, s * 0.62, 0, Math.PI * 2);
+        g.fill();
+    } else if (i === 1) {
+        g.moveTo(0, -s * 0.85);
+        g.lineTo(s * 0.8, s * 0.6);
+        g.lineTo(-s * 0.8, s * 0.6);
+        g.closePath();
+        g.fill();
+    } else if (i === 2) {
+        g.rect(-s * 0.68, -s * 0.68, s * 1.36, s * 1.36);
+        g.fill();
+    } else {
+        g.moveTo(-s * 0.75, -s * 0.75);
+        g.lineTo(s * 0.75, s * 0.75);
+        g.moveTo(s * 0.75, -s * 0.75);
+        g.lineTo(-s * 0.75, s * 0.75);
+        g.stroke();
+    }
+    g.restore();
+}
+
+// Palette umschalten: Farbwerte tauschen und laufende Objekte mit umfaerben,
+// damit Farbvergleiche (Kollision, Items) weiter passen.
+function applyPalette(mode) {
+    if (!PALETTES[mode]) mode = 'normal';
+    const old = palette.colors.slice();
+    paletteMode = mode;
+    palette = PALETTES[mode];
+    try { localStorage.setItem('sw_palette', mode); } catch (e) {}
+    COLOR_PINK   = palette.colors[0];
+    COLOR_CYAN   = palette.colors[1];
+    COLOR_YELLOW = palette.colors[2];
+    COLOR_PURPLE = palette.colors[3];
+    const remap = c => { const i = old.indexOf(c); return i === -1 ? c : palette.colors[i]; };
+    obstacles.forEach(o => { o.color = Array.isArray(o.color) ? o.color.map(remap) : remap(o.color); });
+    items.forEach(it => { it.color = remap(it.color); });
+    projectiles.forEach(p => { p.color = remap(p.color); });
+    if (typeof clearShooterColor !== 'undefined' && clearShooterColor) clearShooterColor = remap(clearShooterColor);
+    if (typeof tutorialFirstColor !== 'undefined' && tutorialFirstColor) tutorialFirstColor = remap(tutorialFirstColor);
+}
+// Startbeschriftung des Stufen-Banners in der aktiven Palette
+if (levelEl) levelEl.innerText = getLevelSettings(0).name;
+
 const TYPE_DUAL_GAP = 'DUAL_GAP';
 const TYPE_TRIPLE_GAP = 'TRIPLE_GAP';
 const TYPE_BOMB = 'BOMB';
@@ -742,7 +848,7 @@ canvas.addEventListener('touchcancel', () => { isDragging = false; });
 function resetGame() {
     score = 0;
     scoreEl.innerText = score;
-    levelEl.innerText = "Stufe 1: Tutorial (Roter Fokus) 🔴";
+    levelEl.innerText = getLevelSettings(0).name;
     levelEl.style.color = COLOR_PINK;
     obstacles = [];
     items = [];
@@ -780,14 +886,14 @@ function resetGame() {
 
 function getLevelSettings(s) {
     if (s >= 125) {
-        return { speed: 490, name: "Stufe 9: Goldene Kugel aktiv 🌟", color: COLOR_PURPLE };
+        return { speed: 490, name: 'Stufe 9: ' + ballName(3) + ' freigeschaltet! ' + ballDot(3), color: COLOR_PURPLE };
     } else if (s >= 90) {
         return { speed: 440, name: "Stufe 8: TRIPLE-GAPS freigeschaltet! 👥⚡", color: "#00ffcc" };
     } else if (s >= 72) {
         return { speed: 410, name: "Stufe 7: Tri-Color Highspeed ⚡", color: COLOR_YELLOW };
     } else if (s >= 51) {
         let local = s - 51;
-        if (local < 4) return { speed: 310, name: "Stufe 6: Gelb freigeschaltet! 🌟", color: COLOR_YELLOW };
+        if (local < 4) return { speed: 310, name: 'Stufe 6: ' + ballName(2) + ' freigeschaltet! ' + ballDot(2), color: COLOR_YELLOW };
         return { speed: 350, name: "Stufe 6: Tri-Color Einstieg 🌟", color: COLOR_YELLOW };
     } else if (s >= 41) {
         return { speed: 380, name: "Stufe 5: Dual-Gaps aktiv! 👥", color: COLOR_PINK };
@@ -796,9 +902,9 @@ function getLevelSettings(s) {
     } else if (s >= 20) {
         return { speed: 320, name: "Stufe 3: Tempo erhöht", color: COLOR_CYAN };
     } else if (s >= 12) {
-        return { speed: 290, name: "Stufe 2: Cyan freigeschaltet! 🔵", color: COLOR_CYAN };
+        return { speed: 290, name: 'Stufe 2: ' + ballName(1) + ' freigeschaltet! ' + ballDot(1), color: COLOR_CYAN };
     }
-    return { speed: 285, name: "Stufe 1: Tutorial (Roter Fokus) 🔴", color: "#00ff66" };
+    return { speed: 285, name: 'Stufe 1: ' + ballName(0) + ' im Fokus ' + ballDot(0), color: "#00ff66" };
 }
 
 function update() {
@@ -835,16 +941,16 @@ function update() {
 
     if (starPowerTimer > 0) {
         levelEl.innerText = '🌟 IMMUNITY AKTIV';
-        levelEl.style.color = '#ffcc00';
+        levelEl.style.color = COLOR_YELLOW;
     } else if (slowMotionTimer > 0) {
         levelEl.innerText = '⏳ ZEITLUPE AKTIV';
-        levelEl.style.color = '#00f2fe';
+        levelEl.style.color = COLOR_CYAN;
     } else if (clearCharges > 0 || projectiles.length > 0) {
         levelEl.innerText = '💥 SPRENGUNG: noch ' + (clearCharges + projectiles.length) + ' Balken';
         levelEl.style.color = '#ff3300';
     } else if (wideGapTimer > 0) {
         levelEl.innerText = '↔ BREITE LÜCKEN AKTIV';
-        levelEl.style.color = '#aa00ff';
+        levelEl.style.color = COLOR_PURPLE;
     } else {
         levelEl.innerText = settings.name;
         levelEl.style.color = settings.color;
@@ -974,7 +1080,7 @@ function update() {
                 score += 1;
                 scoreEl.innerText = score;
                 createFloatingText("+1 Star Point! 🌟", orbitX, orbitY - 50);
-                triggerJuiceEffect('#ffcc00');
+                triggerJuiceEffect(COLOR_YELLOW);
                 continue; 
             }
 
@@ -2481,12 +2587,12 @@ function draw() {
             ctx.strokeRect(obs.gapX2 + obs.gapWidth2, obs.y, canvas.width - (obs.gapX2 + obs.gapWidth2), obs.height);
         } else if (obs.color === COLOR_RAINBOW) {
             let gradient1 = ctx.createLinearGradient(0, obs.y, obs.gapX, obs.y);
-            gradient1.addColorStop(0, '#ff007f'); gradient1.addColorStop(0.5, '#00f2fe'); gradient1.addColorStop(1, '#ffcc00');
+            gradient1.addColorStop(0, COLOR_PINK); gradient1.addColorStop(0.5, COLOR_CYAN); gradient1.addColorStop(1, COLOR_YELLOW);
             ctx.fillStyle = '#16161f'; ctx.fillRect(0, obs.y, obs.gapX, obs.height);
             ctx.strokeStyle = gradient1; ctx.lineWidth = 4; ctx.strokeRect(0, obs.y, obs.gapX, obs.height);
 
             let gradient2 = ctx.createLinearGradient(obs.gapX + obs.gapWidth, obs.y, canvas.width, obs.y);
-            gradient2.addColorStop(0, '#ffcc00'); gradient2.addColorStop(0.5, '#ff007f'); gradient2.addColorStop(1, '#00f2fe');
+            gradient2.addColorStop(0, COLOR_YELLOW); gradient2.addColorStop(0.5, COLOR_PINK); gradient2.addColorStop(1, COLOR_CYAN);
             ctx.fillRect(obs.gapX + obs.gapWidth, obs.y, canvas.width - (obs.gapX + obs.gapWidth), obs.height);
             ctx.strokeStyle = gradient2; ctx.strokeRect(obs.gapX + obs.gapWidth, obs.y, canvas.width - (obs.gapX + obs.gapWidth), obs.height);
         } else if (Array.isArray(obs.color)) {
@@ -2503,6 +2609,30 @@ function draw() {
             ctx.strokeStyle = obs.color; ctx.lineWidth = 3;
             ctx.strokeRect(0, obs.y, obs.gapX, obs.height); ctx.strokeRect(obs.gapX + obs.gapWidth, obs.y, canvas.width - (obs.gapX + obs.gapWidth), obs.height);
         }
+        // Symbol in der Luecke zeigt, welche Kugel hier durch muss
+        if (palette.symbols && obs.type !== TYPE_BOMB && obs.color !== COLOR_RAINBOW) {
+            const gy = obs.y + obs.height / 2;
+            const marke = (i, mx) => {
+                if (i < 0) return;
+                drawBallGlyph(ctx, i, mx, gy, 9, palette.colors[i]);
+            };
+            if (obs.type === TYPE_TRIPLE_GAP) {
+                marke(ballIndex(obs.color[0]), obs.gapX + obs.gapWidth / 2);
+                marke(ballIndex(obs.color[1]), obs.gapX2 + obs.gapWidth2 / 2);
+                marke(ballIndex(obs.color[2]), obs.gapX3 + obs.gapWidth3 / 2);
+            } else if (obs.type === TYPE_DUAL_GAP) {
+                marke(ballIndex(obs.color[0]), obs.gapX + obs.gapWidth / 2);
+                marke(ballIndex(obs.color[1]), obs.gapX2 + obs.gapWidth2 / 2);
+            } else if (Array.isArray(obs.color)) {
+                // Zebra: alle erlaubten Farben nebeneinander in die eine Luecke
+                const idx = obs.color.map(ballIndex).filter(i => i >= 0);
+                const schritt = 20;
+                const links = obs.gapX + obs.gapWidth / 2 - (idx.length - 1) * schritt / 2;
+                idx.forEach((i, k) => marke(i, links + k * schritt));
+            } else {
+                marke(ballIndex(obs.color), obs.gapX + obs.gapWidth / 2);
+            }
+        }
         if (_sg) { obs.gapX = _sg.gapX; obs.gapWidth = _sg.gapWidth; obs.gapX2 = _sg.gapX2; obs.gapWidth2 = _sg.gapWidth2; obs.gapX3 = _sg.gapX3; obs.gapWidth3 = _sg.gapWidth3; }
     });
 
@@ -2510,9 +2640,9 @@ function draw() {
 
     // Item-Timer oben rechts: alle aktiven Items als Kreisuhren
     const activeTimers = [
-        { t: starPowerTimer,  max: 6.2, color: '#ffcc00', icon: '🌟' },
-        { t: slowMotionTimer, max: 5.2, color: '#00f2fe', icon: '⏳' },
-        { t: wideGapTimer,    max: 5.2, color: '#aa00ff', icon: '↔'  },
+        { t: starPowerTimer,  max: 6.2, color: COLOR_YELLOW, icon: '🌟' },
+        { t: slowMotionTimer, max: 5.2, color: COLOR_CYAN, icon: '⏳' },
+        { t: wideGapTimer,    max: 5.2, color: COLOR_PURPLE, icon: '↔'  },
         { t: shieldTimer,     max: 10.2, color: '#ffffff', icon: '🛡️' },
     ].filter(x => x.t > 0);
     activeTimers.forEach((item, i) => {
@@ -2574,6 +2704,21 @@ function draw() {
         ctx.fillStyle = (score >= 125 || starPowerTimer > 0) ? fillPurple : 'rgba(255,255,255,0.01)';
         ctx.shadowColor = fillPurple; ctx.fill();
         
+
+        // Symbole in den Kugeln, damit sie auch ohne Farbunterscheidung erkennbar sind
+        if (palette.symbols) {
+            ctx.shadowBlur = 0;
+            const glyphKugeln = [
+                [0, pX, pY, true],
+                [1, cX, cY, score >= 12 || starPowerTimer > 0],
+                [2, yX, yY, score >= 51 || starPowerTimer > 0],
+                [3, bX, bY, score >= 125 || starPowerTimer > 0]
+            ];
+            glyphKugeln.forEach(([i, gx, gy, sichtbar]) => {
+                if (!sichtbar) return;
+                drawBallGlyph(ctx, i, gx, gy, sphereRadius, glyphInk(palette.colors[i]));
+            });
+        }
         ctx.globalAlpha = 1.0; // WICHTIG: Hier setzen wir Alpha zurück
         ctx.shadowBlur = 0; 
     }
@@ -2690,7 +2835,33 @@ function closeHamburger() {
 }
 
 // ── Help Screen ─────────────────────────────────────────────
+
+// Kugel-Liste in der Hilfe: Farben, Namen und Symbole der aktiven Palette
+const BALL_SCHWELLEN = ['immer aktiv', 'ab Score 12', 'ab Score 51', 'ab Score 125'];
+const BALL_BESCHREIBUNG = [
+    'Deine erste Kugel, von Anfang an dabei.',
+    'Zweite Kugel, gegenüberliegend von Kugel 1.',
+    'Dritte Kugel, erscheint zwischen den ersten beiden.',
+    'Vierte Kugel, schließt das Rad.'
+];
+const GLYPH_NAMEN = ['Punkt', 'Dreieck', 'Quadrat', 'Kreuz'];
+function renderHelpBalls() {
+    const box = document.getElementById('help-balls');
+    if (!box) return;
+    box.innerHTML = palette.colors.map((c, i) => {
+        const sym = palette.symbols ? ' · Symbol: ' + GLYPH_NAMEN[i] : '';
+        return '<div class="help-item">'
+            + '<div class="help-icon" style="color:' + c + ';">●</div>'
+            + '<div><div class="help-name">' + palette.names[i] + ' – ' + BALL_SCHWELLEN[i] + '</div>'
+            + '<div class="help-desc">' + BALL_BESCHREIBUNG[i] + sym + '</div></div>'
+            + '</div>';
+    }).join('');
+    const swap = document.getElementById('help-swap-desc');
+    if (swap) swap.textContent = 'Gegenüberliegende Kugeln tauschen sofort die Plätze: '
+        + ballName(0) + ' ⇄ ' + ballName(1) + ' und ' + ballName(2) + ' ⇄ ' + ballName(3) + '. Schnell umdenken!';
+}
 function openHelp() {
+    renderHelpBalls();
     document.getElementById('help-screen').classList.add('active');
     document.getElementById('hamburger-btn').style.display = 'none';
     gamePaused = true;
@@ -2882,7 +3053,39 @@ function openSettings() {
     gamePaused = true;
     updateMusicToggleLabel();
     updateAccountSection();
+    renderPaletteUI();
 }
+// Farbmodus umschalten und die Anzeige aktualisieren
+function choosePalette(mode) {
+    applyPalette(mode);
+    renderPaletteUI();
+    renderHelpBalls();
+    if (levelEl) levelEl.innerText = getLevelSettings(gameOver ? 0 : score).name;
+    const tutOffen = document.getElementById('tutorial-overlay');
+    if (tutOffen && tutOffen.classList.contains('active')) renderTutorialSlide();
+}
+
+function renderPaletteUI() {
+    document.querySelectorAll('.palette-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.palette === paletteMode);
+    });
+    const hint = document.getElementById('palette-hint');
+    if (hint) hint.textContent = palette.hint;
+    const prev = document.getElementById('palette-preview');
+    if (!prev) return;
+    prev.innerHTML = '';
+    palette.colors.forEach((c, i) => {
+        const cv = document.createElement('canvas');
+        cv.width = 34; cv.height = 34;
+        const g = cv.getContext('2d');
+        g.fillStyle = c;
+        g.beginPath(); g.arc(17, 17, 13, 0, Math.PI * 2); g.fill();
+        if (palette.symbols) drawBallGlyph(g, i, 17, 17, 13, glyphInk(c));
+        cv.title = palette.names[i];
+        prev.appendChild(cv);
+    });
+}
+
 function closeSettings() {
     document.getElementById('settings-screen').classList.remove('active');
     openHamburger();
@@ -3258,12 +3461,12 @@ const TUTORIAL_SLIDES = [
       test: { score: 0, force: 'SINGLE', showScore: true } },
     { icon: '🎯', title: 'Risky Bonus', text: 'Wenn du sehr nah am Rand einer Lücke bleibst, gibt es +2 statt +1 Punkt.\n3 Riskys hintereinander = Triple Risky (+3 Bonus)!\n10 in Folge = Magical Risky (+10 Bonus)!\nLange Serien (25, 50, 100 …) geben fette Extra-Boni!',
       test: { score: 0, force: 'SINGLE', showScore: true } },
-    { icon: '🔵', title: 'Zwei Farben', text: 'Ab Score 12 kommt die Cyan-Kugel dazu. Jeder Balken hat eine Farbe – die Kugel mit der passenden Farbe muss durch die Lücke.',
-      test: { score: 12, force: 'SINGLE', firstColor: COLOR_CYAN } },
-    { icon: '🌟', title: 'Drei Farben', text: 'Ab Score 51 kommt Gelb dazu. Behalte alle Kugeln im Blick und drehe die richtige Kugel zur Lücke!',
-      test: { score: 51, force: 'SINGLE', firstColor: COLOR_YELLOW } },
-    { icon: '🟣', title: 'Vier Farben', text: 'Ab Score 125 vervollständigt Lila das Rad. Jetzt zählt jede Vierteldrehung!',
-      test: { score: 125, force: 'SINGLE', firstColor: COLOR_PURPLE } },
+    { icon: '🔵', iconBall: 1, title: 'Zwei Farben', text: 'Ab Score 12 kommt die {{n1}}-Kugel dazu. Jeder Balken hat eine Farbe – die Kugel mit der passenden Farbe muss durch die Lücke.',
+      test: { score: 12, force: 'SINGLE', firstBall: 1 } },
+    { icon: '🌟', iconBall: 2, title: 'Drei Farben', text: 'Ab Score 51 kommt {{n2}} dazu. Behalte alle Kugeln im Blick und drehe die richtige Kugel zur Lücke!',
+      test: { score: 51, force: 'SINGLE', firstBall: 2 } },
+    { icon: '🟣', iconBall: 3, title: 'Vier Farben', text: 'Ab Score 125 vervollständigt {{n3}} das Rad. Jetzt zählt jede Vierteldrehung!',
+      test: { score: 125, force: 'SINGLE', firstBall: 3 } },
     { icon: '👥', title: 'Doppel-Balken', text: 'Zwei Balken mit zwei Lücken gleichzeitig – links und rechts. BEIDE Kugeln müssen durch ihre jeweilige Lücke!',
       test: { score: 12, force: 'DUAL' } },
     { icon: '🦓', title: 'Zebra-Balken', text: 'Gestreifte Balken gelten für mehrere Farben gleichzeitig. Auch hier reicht es, wenn eine der passenden Kugeln die Lücke trifft.',
@@ -3272,12 +3475,17 @@ const TUTORIAL_SLIDES = [
       test: { score: 12, force: 'BOMB' } },
     { icon: '✨', title: 'Items', text: '🌟 Star Immunity · ⏳ Zeitlupe\n🛡️ Schild · 💥 Sprengung · ↔ Breite Lücken\n\nFliege durch sie hindurch um sie zu aktivieren.',
       test: { score: 10, itemBoost: true } },
-    { icon: '🔀', title: 'Farbtausch', text: 'Ab Score 155: Beim Einsammeln tauschen gegenüberliegende Kugeln sofort die Plätze – Pink ⇄ Cyan und Gelb ⇄ Lila. Schnell umdenken!',
+    { icon: '🔀', title: 'Farbtausch', text: 'Ab Score 155: Beim Einsammeln tauschen gegenüberliegende Kugeln sofort die Plätze – {{n0}} ⇄ {{n1}} und {{n2}} ⇄ {{n3}}. Schnell umdenken!',
       test: { score: 155, force: 'SINGLE', itemBoost: true, forceItem: 'SWAP' } },
     { icon: '🚀', title: 'Los geht\'s!', text: 'Erreiche hohe Scores und schlage deine Freunde in der Bestenliste.\n\nViel Erfolg!',
       test: null }
 ];
 let tutorialStep = 0;
+
+// {{n0}}..{{n3}} in Tutorialtexten durch die Namen der aktiven Palette ersetzen
+function fillBallNames(s) {
+    return String(s).replace(/{{n([0-3])}}/g, (m, i) => ballName(Number(i)));
+}
 
 function startTutorial() {
     tutorialStep = 0;
@@ -3338,7 +3546,7 @@ function tutorialTry() {
     tutorialItemBoost = !!cfg.itemBoost;
     tutorialForceType = cfg.force || null;
     tutorialForceItem = cfg.forceItem || null;
-    tutorialFirstColor = cfg.firstColor || null;
+    tutorialFirstColor = (cfg.firstBall != null) ? ballColor(cfg.firstBall) : null;
     scoreEl.innerText = score;
     document.getElementById('score-line').style.display = cfg.showScore ? '' : 'none';
     spawnTimer = tutorialNoSpawn ? 0 : 9999;
@@ -3392,9 +3600,9 @@ function tutorialResume() {
 }
 function renderTutorialSlide() {
     const slide = TUTORIAL_SLIDES[tutorialStep];
-    document.getElementById('tut-icon').textContent = slide.icon;
-    document.getElementById('tut-title').textContent = slide.title;
-    document.getElementById('tut-text').textContent = slide.text;
+    document.getElementById('tut-icon').textContent = (slide.iconBall != null) ? ballDot(slide.iconBall) : slide.icon;
+    document.getElementById('tut-title').textContent = fillBallNames(slide.title);
+    document.getElementById('tut-text').textContent = fillBallNames(slide.text);
     const isLast = tutorialStep === TUTORIAL_SLIDES.length - 1;
     document.getElementById('tut-next-btn').textContent = isLast ? 'Fertig ✓' : 'Weiter →';
     document.getElementById('tut-back-btn').style.visibility = tutorialStep === 0 ? 'hidden' : 'visible';
