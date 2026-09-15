@@ -198,3 +198,35 @@ function leadVoice(freq, t, dur) {
     });
 }
 ```
+
+---
+
+## Version 7 — "Welt-Soundtrack" (2026-09-15)
+
+Stand ab Service-Worker `orbit-sync-v78`. Keine einzelne Schleife mehr, sondern
+`MUSIC_TRACKS` mit einem Stück pro Welt (gleiche Reihenfolge wie `WORLDS`).
+Der komplette Code steht in `SpaceWheel.html` zwischen
+"Hintergrundmusik & Soundeffekte" und "Soundeffekte".
+
+| Welt | Tonart / Akkorde | BPM (Finale) | Lead | Schlagzeug / Bass |
+|---|---|---|---|---|
+| Tiefer Raum | Em – C – G – D (Version 2) | 150 (166) | saw | floor / offbeat |
+| Eisplanet | F#m – D – Bm – C# | 140 (158) | bell | broken / offbeat |
+| Wüstenplanet | D – Eb – Cm – Eb (phrygisch-dur) | 128 (150) | reed | tribal / gallop |
+| Smaragdwelt | Dm – G – Bb – C (dorisch) | 146 (164) | pluck | shuffle / roll |
+| Gasriese | Bm – G – Em – F# | 136 (156) | super | half / sustain |
+| Vulkanwelt | Cm – Ab – Bb – G | 150 (172) | grit | drive / roll |
+
+Schichten nach freigeschalteten Farben (Score 12 / 51 / 125):
+1 Farbe ohne Melodie, 2 Farben mit Melodie + Snare, 3 Farben mit Glocken-Ostinato
+und Shaker, ab Score 125 (Stufe 9) das Finale: schnelleres Tempo,
+Herzschlag-Kick (Bumm auf 1 und 3, Nachschlag drei Sechzehntel später),
+treibender Bass, Lead zusätzlich eine Oktave tiefer, Riser + Crash pro Loop.
+
+**Version 2 wiederherstellen:** Die Akkorde von Version 2 stecken unverändert in
+`MUSIC_TRACKS[0]`. Einen älteren Stand dort eintragen, nicht mehr über
+`MUSIC_CHORDS`/`ARP_SEQ` (die gibt es nicht mehr).
+
+Gemessene Pegel (OfflineAudioContext, Master 0.22): RMS −33 bis −38 dBFS,
+Spitzen maximal −14 dBFS. Ein Kompressor wurde getestet und wieder entfernt:
+Er griff nie ein und hob nur alles um 3,4 dB an.
