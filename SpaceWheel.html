@@ -229,11 +229,20 @@
         }
         #help-screen.active, #settings-screen.active, #worlds-screen.active { display: flex; }
         .world-item {
-            width: 100%; background: #13141a; border: 1px solid #2a2b3d; border-radius: 12px;
+            width: 100%; box-sizing: border-box; background: #13141a; border: 1px solid #2a2b3d; border-radius: 12px;
             padding: 14px 16px; margin-bottom: 8px; display: flex; gap: 12px;
-            align-items: center; cursor: pointer; text-align: left; color: #e0e0e0;
+            align-items: center; text-align: left; color: #e0e0e0;
         }
-        .world-item:active { background: #1e1f2e; }
+        .world-item.chosen { border-color: #ff007f; }
+        .world-text { flex: 1; min-width: 0; }
+        .world-actions { display: flex; gap: 6px; flex-shrink: 0; }
+        .world-btn { background: #1e1f2e; border: 1px solid #2a2b3d; color: #e0e0e0; border-radius: 8px;
+            padding: 7px 10px; font-size: 12px; cursor: pointer; }
+        .world-btn:active { background: #2a2b3d; }
+        .world-btn.primary { background: #ff007f; border-color: #ff007f; color: #fff; cursor: default; }
+        #test-badge { display: none; color: #ffcc00; font-weight: bold; }
+        #ui-layer.testrunde #test-badge { display: inline; }
+        #ui-layer.testrunde #highscore-part { display: none !important; }
         .help-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; width: 100%; max-width: 420px; }
         .help-back { background: #1e1f2e; border: none; color: #fff; width: 38px; height: 38px; border-radius: 50%; font-size: 20px; cursor: pointer; flex-shrink: 0; }
         .help-title-text { font-size: 20px; font-weight: bold; }
@@ -510,9 +519,9 @@
             <div class="help-title-text">🌍 Welten</div>
         </div>
         <div class="help-section">
-            <div class="help-sec-title">Zum Ausprobieren antippen</div>
+            <div class="help-sec-title">Welt fürs Spiel</div>
             <div id="worlds-list"></div>
-            <div class="help-desc" style="padding:10px 4px 0;">Im Testmodus bleibt die gewählte Welt dauerhaft aktiv. Über „▶ Spielen" im Menü geht es zurück ins normale Spiel, in dem die Welten mit dem Score wechseln.</div>
+            <div class="help-desc" style="padding:10px 4px 0;"><b>Testen</b> startet sofort eine Testrunde in dieser Welt. Testrunden zählen nicht zum Highscore.<br><b>Übernehmen</b> legt die Welt für das richtige Spiel fest, sie bleibt dann das ganze Spiel über. Los geht es wie gewohnt über „▶ Spielen". Mit „Automatisch" wechseln die Welten wieder mit dem Score.</div>
         </div>
     </div>
 
@@ -609,7 +618,7 @@
     </div>
 
     <div id="ui-layer">
-        <span id="score-line">Score: <span id="score">0</span><span id="highscore-part"> | Highscore: <span id="highscore">0</span></span></span>
+        <span id="score-line"><span id="test-badge">🧪 TESTRUNDE · </span>Score: <span id="score">0</span><span id="highscore-part"> | Highscore: <span id="highscore">0</span></span></span>
         <div id="level-banner"></div>
     </div>
     <canvas id="gameCanvas" width="450" height="800"></canvas>
@@ -892,7 +901,7 @@ function resetGame() {
     perfectStreak = 0;
     isDragging = false;
     lastTime = performance.now();
-    currentWorld = forcedWorld || WORLDS[0];
+    currentWorld = forcedWorld || chosenWorld || WORLDS[0];
     worldCanvas = null;
     prevWorldCanvas = null;
     worldFade = 1;
@@ -1706,7 +1715,8 @@ function triggerGameOver(cause) {
         return;
     }
     gameOver = true; isDragging = false;
-    if (score > highscore) {
+    // Testrunden aus dem Welten-Menü zählen nicht zum Highscore
+    if (!forcedWorld && score > highscore) {
         highscore = score;
         localStorage.setItem(HS_KEY, highscore);
         localStorage.setItem(HS_OWNER_KEY, fbUser ? fbUser.uid : 'guest');
@@ -1875,7 +1885,10 @@ const WORLDS = [
         ambient: { c: '#ffd45c', n: 32, vy: -30, drift: 14, r: 1.5 }
     }
 ];
-let forcedWorld = null; // im Welten-Testmodus gesetzt
+let forcedWorld = null; // nur während einer Testrunde aus dem Welten-Menü gesetzt
+// Fürs richtige Spiel übernommene Welt (null = Welten wechseln mit dem Score)
+let chosenWorld = null;
+try { chosenWorld = WORLDS.find(w => w.name === localStorage.getItem('sw_world')) || null; } catch (e) {}
 
 let currentWorld = WORLDS[0];
 let worldCanvas = null, prevWorldCanvas = null, worldFade = 1;
@@ -1897,6 +1910,7 @@ function mulberry32(a) {
 
 function getWorld(s) {
     if (forcedWorld) return forcedWorld;
+    if (chosenWorld) return chosenWorld;
     let w = WORLDS[0];
     for (const world of WORLDS) if (s >= world.minScore) w = world;
     return w;
@@ -2771,9 +2785,17 @@ function draw() {
     if (gameOver) {
         ctx.fillStyle = 'rgba(10, 10, 15, 0.92)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = '#ffffff'; ctx.font = 'bold 24px Segoe UI'; ctx.textAlign = 'center';
-        ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 20);
-        ctx.fillStyle = '#45f3ff'; ctx.font = '18px Segoe UI';
-        ctx.fillText('Bildschirm berühren für Neustart', canvas.width / 2, canvas.height / 2 + 20);
+        if (forcedWorld) {
+            ctx.fillText('TESTRUNDE BEENDET', canvas.width / 2, canvas.height / 2 - 40);
+            ctx.fillStyle = '#ffcc00'; ctx.font = '16px Segoe UI';
+            ctx.fillText('Score ' + score + ' · zählt nicht zum Highscore', canvas.width / 2, canvas.height / 2 - 8);
+            ctx.fillStyle = '#45f3ff'; ctx.font = '18px Segoe UI';
+            ctx.fillText('Berühren für neue Testrunde', canvas.width / 2, canvas.height / 2 + 30);
+        } else {
+            ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 20);
+            ctx.fillStyle = '#45f3ff'; ctx.font = '18px Segoe UI';
+            ctx.fillText('Bildschirm berühren für Neustart', canvas.width / 2, canvas.height / 2 + 20);
+        }
     }
 }
 
@@ -2897,6 +2919,8 @@ function closeHelp() {
 
 // ── Tutorial-Frage beim ersten Spielen auf einem Account ────
 function startPlayFromMenu() {
+    // „Spielen" beendet eine Testrunde und startet das richtige Spiel
+    if (forcedWorld) { forcedWorld = null; updateTestHud(); resetGame(); }
     const asked = (fbUser && fbUserData)
         ? fbUserData.tutorialAsked
         : localStorage.getItem('sw_tutorial_asked') === 'yes';
@@ -2904,7 +2928,6 @@ function startPlayFromMenu() {
         maybeAskTutorial();
         return;
     }
-    if (forcedWorld) { forcedWorld = null; resetGame(); }
     closeHamburger();
 }
 function maybeAskTutorial() {
@@ -3045,29 +3068,54 @@ async function confirmDeleteAccount() {
     }
 }
 
-// ── Welten-Testmodus ────────────────────────────────────────
+// ── Welten: Testrunde und Welt fürs Spiel ───────────────────
 function openWorlds() {
-    document.getElementById('worlds-list').innerHTML = WORLDS.map((w, i) =>
-        '<button class="world-item" onclick="playWorld(' + i + ')">' +
-        '<div class="help-icon">' + w.icon + '</div>' +
-        '<div><div class="help-name">' + w.name + '</div>' +
-        '<div class="help-desc">Im Spiel ab Score ' + w.minScore + '</div></div></button>'
-    ).join('');
+    renderWorldsList();
     document.getElementById('worlds-screen').classList.add('active');
     document.getElementById('hamburger-btn').style.display = 'none';
     gamePaused = true;
+}
+function renderWorldsList() {
+    const zeile = (icon, name, desc, aktiv, testIndex, wahl) =>
+        '<div class="world-item' + (aktiv ? ' chosen' : '') + '">' +
+        '<div class="help-icon">' + icon + '</div>' +
+        '<div class="world-text"><div class="help-name">' + name + '</div>' +
+        '<div class="help-desc">' + desc + '</div></div>' +
+        '<div class="world-actions">' +
+        (testIndex != null ? '<button class="world-btn" onclick="playWorld(' + testIndex + ')">Testen</button>' : '') +
+        (aktiv ? '<button class="world-btn primary">✓ Aktiv</button>'
+               : '<button class="world-btn" onclick="chooseWorld(' + wahl + ')">Übernehmen</button>') +
+        '</div></div>';
+    document.getElementById('worlds-list').innerHTML =
+        zeile('🔄', 'Automatisch', 'Welten wechseln mit dem Score', !chosenWorld, null, -1) +
+        WORLDS.map((w, i) => zeile(w.icon, w.name, 'ab Score ' + w.minScore, chosenWorld === w, i, i)).join('');
 }
 function closeWorlds() {
     document.getElementById('worlds-screen').classList.remove('active');
     openHamburger();
 }
+// Welt fürs richtige Spiel festlegen (-1 = automatisch). Startet bewusst
+// nichts — losgehen soll es erst über „▶ Spielen".
+function chooseWorld(i) {
+    chosenWorld = i >= 0 ? WORLDS[i] : null;
+    try {
+        if (chosenWorld) localStorage.setItem('sw_world', chosenWorld.name);
+        else localStorage.removeItem('sw_world');
+    } catch (e) {}
+    renderWorldsList();
+}
+// Testrunde: die Welt bleibt fest, der Score zählt nicht zum Highscore
 function playWorld(i) {
     forcedWorld = WORLDS[i];
+    updateTestHud();
     document.getElementById('worlds-screen').classList.remove('active');
     document.getElementById('hamburger-menu').classList.remove('active');
     resetGame();
     document.getElementById('hamburger-btn').style.display = 'flex';
     gamePaused = false;
+}
+function updateTestHud() {
+    document.getElementById('ui-layer').classList.toggle('testrunde', !!forcedWorld);
 }
 
 // ── Einstellungen ───────────────────────────────────────────
