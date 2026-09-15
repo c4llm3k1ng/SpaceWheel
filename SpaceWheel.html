@@ -521,7 +521,7 @@
         <div class="help-section">
             <div class="help-sec-title">Welt fürs Spiel</div>
             <div id="worlds-list"></div>
-            <div class="help-desc" style="padding:10px 4px 0;"><b>Testen</b> startet sofort eine Testrunde in dieser Welt. Testrunden zählen nicht zum Highscore.<br><b>Übernehmen</b> legt die Welt für das richtige Spiel fest, sie bleibt dann das ganze Spiel über. Los geht es wie gewohnt über „▶ Spielen". Mit „Automatisch" wechseln die Welten wieder mit dem Score.</div>
+            <div class="help-desc" style="padding:10px 4px 0;"><b>Testen</b> startet sofort eine Testrunde in dieser Welt. Testrunden zählen nicht zum Highscore.<br><b>Übernehmen</b> legt die Welt für das richtige Spiel fest, sie bleibt dann das ganze Spiel über. Los geht es wie gewohnt über „▶ Spielen". Mit „Standard" wechseln die Welten wie vorgesehen mit dem Score.</div>
         </div>
     </div>
 
@@ -3087,7 +3087,7 @@ function renderWorldsList() {
                : '<button class="world-btn" onclick="chooseWorld(' + wahl + ')">Übernehmen</button>') +
         '</div></div>';
     document.getElementById('worlds-list').innerHTML =
-        zeile('🔄', 'Automatisch', 'Welten wechseln mit dem Score', !chosenWorld, null, -1) +
+        zeile('🔄', 'Standard', 'Welten wechseln mit dem Score', !chosenWorld, null, -1) +
         WORLDS.map((w, i) => zeile(w.icon, w.name, 'ab Score ' + w.minScore, chosenWorld === w, i, i)).join('');
 }
 function closeWorlds() {
