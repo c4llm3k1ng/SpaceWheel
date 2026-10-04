@@ -21,7 +21,7 @@ sind gegen den tatsächlichen Code von Space Wheel abgeglichen (Stand: 2026-09-1
 | Firebase Auth | interne Kennung + Passwort (nur als Hash) |
 
 **Nur auf dem Gerät (localStorage), verlässt das Gerät nicht:**
-`orbit_highscore_v46`, `sw_hs_owner`, `sw_music`, `sw_sfx`, `sw_tutorial_asked`
+`orbit_highscore_v46`, `sw_hs_owner`, `sw_music`, `sw_sfx`, `sw_tutorial_asked`, `sw_palette` (gewählter Farbmodus), `sw_world` (übernommene Welt)
 
 **Wird ausdrücklich NICHT erhoben:** echte E-Mail-Adresse, Klarname, Standort,
 Geräte- oder Werbe-IDs, Kontakte, Fotos, Mikrofon, Zahlungsdaten, Analytics.

@@ -32,7 +32,10 @@ Breite Lücken – mehr Luft zum Durchkommen
 Farbtausch – gegenüberliegende Kugeln tauschen die Plätze
 
 SECHS WELTEN
-Je höher dein Punktestand, desto weiter reist du. Vom tiefen Raum mit ferner Spiralgalaxie über einen Eisplaneten mit Polarlichtern, einen Wüstenplaneten mit Dünen und eine Smaragdwelt voller Kristalle bis zum Ringplaneten und zur Vulkanwelt mit fließender Lava und ausbrechenden Kratern.
+Je höher dein Punktestand, desto weiter reist du. Vom tiefen Raum mit ferner Spiralgalaxie über einen Eisplaneten mit Polarlichtern, einen Wüstenplaneten mit Dünen und eine Smaragdwelt voller Kristalle bis zum Ringplaneten und zur Vulkanwelt mit fließender Lava und ausbrechenden Kratern. Jede Welt hat ihren eigenen Soundtrack, der mit jeder neuen Kugelfarbe voller wird — und auf der letzten Stufe in ein schnelleres Finale mit Herzschlag-Rhythmus wechselt. Im Menü kannst du jede Welt vorab testen oder eine davon fest fürs Spiel übernehmen.
+
+AUCH MIT FARBSEHSCHWÄCHE SPIELBAR
+Neben der normalen Ansicht gibt es zwei geprüfte Farbsätze: einen für Rot-Grün-Blindheit und einen für Blau-Gelb-Blindheit. Umgestellt wird in den Einstellungen, und mit den Farben wechseln auch alle Texte im Spiel, in der Hilfe und im Tutorial.
 
 SPIELE GEGEN FREUNDE
 Sichere deinen Highscore in einem Konto, füge Freunde per Nutzername oder per sechsstelligem Freundescode hinzu und vergleiche dich in der globalen Bestenliste und in der Bestenliste unter Freunden.
