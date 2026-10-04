@@ -545,6 +545,17 @@
         </div>
 
         <div class="help-section">
+            <div class="help-sec-title">Sprache / Language</div>
+            <div class="help-item" style="display:block;">
+                <div class="help-name" style="margin-bottom:8px;">Sprache</div>
+                <div class="palette-row">
+                    <button class="palette-btn lang-btn" data-lang="de" onclick="chooseLanguage('de')">Deutsch</button>
+                    <button class="palette-btn lang-btn" data-lang="en" onclick="chooseLanguage('en')">English</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="help-section">
             <div class="help-sec-title">Farben</div>
             <div class="help-item" style="display:block;">
                 <div class="help-name" style="margin-bottom:4px;">Farbmodus</div>
@@ -643,6 +654,316 @@ function zeigeBanner(text, farbe) {
 }
 
 let score = 0;
+// ── Sprache / Language ──────────────────────────────────────
+// Die deutschen Texte sind zugleich die Schlüssel. t() gibt auf Deutsch den
+// Text unverändert zurück und auf Englisch die Übersetzung aus TEXTE.
+const TEXTE = {
+    "Melde dich an, um Scores zu speichern": "Sign in to save your scores",
+    "Anmelden": "Sign in",
+    "Registrieren": "Sign up",
+    "Ohne Konto spielen": "Play without an account",
+    "Nutzername": "Username",
+    "Passwort (mind. 6 Zeichen)": "Password (at least 6 characters)",
+    "Nutzername oder Freundescode": "Username or friend code",
+    "Bitte alle Felder ausfüllen": "Please fill in all fields",
+    "Nutzername mind. 3 Zeichen": "Username needs at least 3 characters",
+    "Passwort mind. 6 Zeichen": "Password needs at least 6 characters",
+    "Passwort zu schwach (mind. 6 Zeichen)": "Password too weak (at least 6 characters)",
+    "Nutzername bereits vergeben": "Username already taken",
+    "Nutzername oder Passwort falsch": "Wrong username or password",
+    "Bitte Passwort eingeben": "Please enter your password",
+    "Falsches Passwort": "Wrong password",
+    "Nicht angemeldet": "Not signed in",
+    "Nicht gefunden": "Not found",
+    "Bestenliste": "Leaderboard",
+    "👥 Freunde": "👥 Friends",
+    "Freunde": "Friends",
+    "Laden...": "Loading...",
+    "+ Freund hinzufügen": "+ Add friend",
+    "Dein Freundescode": "Your friend code",
+    "Freund hinzufügen": "Add friend",
+    "Gib den Nutzernamen oder den 6-stelligen Freundescode ein": "Enter the username or the 6-digit friend code",
+    "Anfrage senden": "Send request",
+    "Abbrechen": "Cancel",
+    "(du)": "(you)",
+    "Bitte Code oder Nutzernamen eingeben": "Please enter a code or username",
+    "Du kannst dich nicht selbst hinzufügen": "You cannot add yourself",
+    "Freund hinzugefügt!": "Friend added!",
+    "<div style=\"text-align:center;color:#555;padding:40px;\">📡 Keine Internetverbindung<br><br>Die Bestenliste ist offline nicht verfügbar. Dein Highscore wird lokal gespeichert und später synchronisiert.</div>": "<div style=\"text-align:center;color:#555;padding:40px;\">📡 No internet connection<br><br>The leaderboard is not available offline. Your highscore is stored locally and synced later.</div>",
+    "<div style=\"text-align:center;color:#555;padding:40px;\">Melde dich an, um Freunde zu sehen</div>": "<div style=\"text-align:center;color:#555;padding:40px;\">Sign in to see your friends</div>",
+    "<div style=\"text-align:center;color:#ff5555;padding:40px;\">Fehler beim Laden</div>": "<div style=\"text-align:center;color:#ff5555;padding:40px;\">Loading failed</div>",
+    "<div style=\"text-align:center;color:#555;padding:40px;\">Noch keine Einträge</div>": "<div style=\"text-align:center;color:#555;padding:40px;\">No entries yet</div>",
+    "<div style=\"text-align:center;color:#555;padding:20px;\">Noch keine Freunde</div>": "<div style=\"text-align:center;color:#555;padding:20px;\">No friends yet</div>",
+    "Spielen": "Play",
+    "Hilfe": "Help",
+    "Welten": "Worlds",
+    "Einstellungen": "Settings",
+    "🎮 Jetzt testen": "🎮 Try it now",
+    "Überspringen": "Skip",
+    "Weiter →": "Next →",
+    "Fertig ✓": "Done ✓",
+    "📖 Weiter im Tutorial": "📖 Back to the tutorial",
+    "Tutorial spielen?": "Play the tutorial?",
+    "Willkommen bei Space Wheel! Möchtest du zuerst das Tutorial ansehen? Es erklärt dir Steuerung, Balken und Items Schritt für Schritt.": "Welcome to Space Wheel! Would you like to go through the tutorial first? It explains the controls, the bars and the items step by step.",
+    "Nein, danke": "No, thanks",
+    "Ja, gerne!": "Yes, please!",
+    "Alles klar!": "All right!",
+    "Du kannst dir das Tutorial jederzeit im Menü unter „📖 Tutorial\" noch einmal anschauen und spielen.": "You can replay the tutorial any time from the menu under \"📖 Tutorial\".",
+    "Das Rad steuern": "Turning the wheel",
+    "Wische links oder rechts über den Bildschirm, um das Rad zu drehen.\nAm Desktop: Pfeiltasten ← und →": "Swipe left or right across the screen to turn the wheel.\nOn a computer: arrow keys ← and →",
+    "Die Balken": "The bars",
+    "Balken fallen von oben. Positioniere das Rad so, dass deine Kugel durch die Lücke passt – sonst ist das Spiel vorbei! Jede durchquerte Lücke gibt +1 Punkt (siehe Anzeige oben).": "Bars fall from above. Turn the wheel so your ball fits through the gap – otherwise the run is over! Every gap you pass scores +1 point (see the counter at the top).",
+    "Risky Bonus": "Risky bonus",
+    "Wenn du sehr nah am Rand einer Lücke bleibst, gibt es +2 statt +1 Punkt.\n3 Riskys hintereinander = Triple Risky (+3 Bonus)!\n10 in Folge = Magical Risky (+10 Bonus)!\nLange Serien (25, 50, 100 …) geben fette Extra-Boni!": "Stay very close to the edge of a gap and you score +2 instead of +1.\n3 riskys in a row = Triple Risky (+3 bonus)!\n10 in a row = Magical Risky (+10 bonus)!\nLong streaks (25, 50, 100 …) pay huge extra bonuses!",
+    "Zwei Farben": "Two colours",
+    "Ab Score 12 kommt die {{n1}}-Kugel dazu. Jeder Balken hat eine Farbe – die Kugel mit der passenden Farbe muss durch die Lücke.": "From score 12 the {{n1}} ball joins in. Every bar has a colour – the ball in the matching colour has to pass through the gap.",
+    "Drei Farben": "Three colours",
+    "Ab Score 51 kommt {{n2}} dazu. Behalte alle Kugeln im Blick und drehe die richtige Kugel zur Lücke!": "From score 51 {{n2}} joins in. Keep an eye on every ball and turn the right one to the gap!",
+    "Vier Farben": "Four colours",
+    "Ab Score 125 vervollständigt {{n3}} das Rad. Jetzt zählt jede Vierteldrehung!": "From score 125 {{n3}} completes the wheel. Now every quarter turn counts!",
+    "Doppel-Balken": "Double bars",
+    "Zwei Balken mit zwei Lücken gleichzeitig – links und rechts. BEIDE Kugeln müssen durch ihre jeweilige Lücke!": "Two bars with two gaps at once – left and right. BOTH balls have to pass through their own gap!",
+    "Zebra-Balken": "Zebra bars",
+    "Gestreifte Balken gelten für mehrere Farben gleichzeitig. Auch hier reicht es, wenn eine der passenden Kugeln die Lücke trifft.": "Striped bars count for several colours at once. Here too it is enough if one of the matching balls hits the gap.",
+    "Bomben": "Bombs",
+    "Statt eines Balkens fällt eine Bombe. Weiche ihr mit allen Kugeln aus – eine Berührung bedeutet Game Over (außer du hast ein Schild).": "Instead of a bar, a bomb falls. Dodge it with every ball – one touch means game over (unless you have a shield).",
+    "🌟 Star Immunity · ⏳ Zeitlupe\n🛡️ Schild · 💥 Sprengung · ↔ Breite Lücken\n\nFliege durch sie hindurch um sie zu aktivieren.": "🌟 Star Immunity · ⏳ Slow Motion\n🛡️ Shield · 💥 Demolition · ↔ Wide Gaps\n\nFly through them to activate them.",
+    "Farbtausch": "Colour swap",
+    "Ab Score 155: Beim Einsammeln tauschen gegenüberliegende Kugeln sofort die Plätze – {{n0}} ⇄ {{n1}} und {{n2}} ⇄ {{n3}}. Schnell umdenken!": "From score 155: when you collect it, opposite balls swap places instantly – {{n0}} ⇄ {{n1}} and {{n2}} ⇄ {{n3}}. Think fast!",
+    "Los geht's!": "Off you go!",
+    "Erreiche hohe Scores und schlage deine Freunde in der Bestenliste.\n\nViel Erfolg!": "Score high and beat your friends on the leaderboard.\n\nGood luck!",
+    "❓ Hilfe": "❓ Help",
+    "Steuerung": "Controls",
+    "Wischen": "Swipe",
+    "Wische links oder rechts über den Bildschirm, um das Rad zu drehen.": "Swipe left or right across the screen to turn the wheel.",
+    "Tastatur": "Keyboard",
+    "Pfeiltasten ← → zum Drehen (am Desktop).": "Arrow keys ← → turn the wheel (on a computer).",
+    "Kugeln": "Balls",
+    "Hindernisse": "Obstacles",
+    "Ein Balken mit einer Lücke. Drehe das Rad so, dass deine Kugel durchpasst.": "One bar with one gap. Turn the wheel so your ball fits through.",
+    "Zwei Balken mit je einer Lücke. Beide passenden Kugeln müssen durch ihre jeweilige Lücke.": "Two bars with one gap each. Both matching balls have to pass through their own gap.",
+    "Drei Lücken gleichzeitig. Die farbigen Ränder zeigen, welche Kugel links, in die Mitte und rechts muss – ALLE drei Farben müssen durch!": "Three gaps at once. The coloured edges show which ball goes left, centre and right – ALL three colours have to get through!",
+    "Gestreifter Balken für mehrere Farben. Eine der passenden Kugeln muss durch die Lücke.": "A striped bar for several colours. One of the matching balls has to pass through the gap.",
+    "Bombe": "Bomb",
+    "Kein Balken, aber eine Bombe. Berühre sie nicht! Mit einem Schild überstehst du den Treffer.": "Not a bar but a bomb. Do not touch it! With a shield you survive the hit.",
+    "Star Immunity (6,2 s)": "Star Immunity (6.2 s)",
+    "Kollisionen werden ignoriert – Kugeln passieren alle Balken.": "Collisions are ignored – balls pass through every bar.",
+    "Zeitlupe (5,2 s)": "Slow Motion (5.2 s)",
+    "Alle Balken fallen langsamer – mehr Zeit zum Reagieren.": "All bars fall more slowly – more time to react.",
+    "Schild (10,2 s)": "Shield (10.2 s)",
+    "Hält einen Treffer auf. Wird bei einer Kollision verbraucht oder läuft nach 10,2 Sekunden ab.": "Absorbs one hit. It is used up on a collision or expires after 10.2 seconds.",
+    "Sprengung (3 Balken)": "Demolition (3 bars)",
+    "Die Kugel, die das Item einsammelt, schießt auf die nächsten 3 Balken. Beim Treffer explodieren sie – jeder gibt +1 Punkt.": "The ball that collects the item shoots at the next 3 bars. They explode on impact – each one scores +1 point.",
+    "Breite Lücken (5,2 s)": "Wide Gaps (5.2 s)",
+    "Die Lücken aller Balken werden deutlich breiter.": "The gaps in every bar get noticeably wider.",
+    "Farbtausch (ab Score 155)": "Colour Swap (from score 155)",
+    "Gegenüberliegende Kugeln tauschen sofort die Plätze.": "Opposite balls swap places instantly.",
+    "Punkte": "Points",
+    "Normal – +1 Punkt": "Normal – +1 point",
+    "Kugel passiert die Lücke ohne Risiko.": "The ball passes the gap without any risk.",
+    "Risky – +2 Punkte": "Risky – +2 points",
+    "Kugel schrammt am Rand der Lücke entlang (Abstand ≤ 5 px). Immer +2.": "The ball scrapes along the edge of the gap (within 5 px). Always +2.",
+    "Triple Risky – +3 Bonus": "Triple Risky – +3 bonus",
+    "3 Riskys hintereinander: einmaliger Bonus.": "Three riskys in a row: a one-off bonus.",
+    "Magical Risky – +10 Bonus": "Magical Risky – +10 bonus",
+    "10 Riskys hintereinander: großer Bonustreffer!": "Ten riskys in a row: a big bonus!",
+    "Risky-Serien": "Risky streaks",
+    "25, 50, 100, 150, 200 und 250 Riskys in Folge geben jeweils einmalig genauso viele Bonuspunkte (+25, +50, +100 …).": "25, 50, 100, 150, 200 and 250 riskys in a row each pay that many bonus points once (+25, +50, +100 …).",
+    "immer aktiv": "always active",
+    "ab Score 12": "from score 12",
+    "ab Score 51": "from score 51",
+    "ab Score 125": "from score 125",
+    "Deine erste Kugel, von Anfang an dabei.": "Your first ball, there from the start.",
+    "Zweite Kugel, gegenüberliegend von Kugel 1.": "Second ball, opposite ball 1.",
+    "Dritte Kugel, erscheint zwischen den ersten beiden.": "Third ball, appears between the first two.",
+    "Vierte Kugel, schließt das Rad.": "Fourth ball, completes the wheel.",
+    "Gegenüberliegende Kugeln tauschen sofort die Plätze: ": "Opposite balls swap places instantly: ",
+    " und ": " and ",
+    ". Schnell umdenken!": ". Think fast!",
+    "🌍 Welten": "🌍 Worlds",
+    "Welt fürs Spiel": "World for your games",
+    "Testen": "Try",
+    "Übernehmen": "Use",
+    "✓ Aktiv": "✓ Active",
+    "Standard": "Default",
+    "Welten wechseln mit dem Score": "Worlds change with your score",
+    "ab Score ": "from score ",
+    "startet sofort eine Testrunde in dieser Welt. Testrunden zählen nicht zum Highscore.": "starts a test round in this world right away. Test rounds do not count towards the highscore.",
+    "legt die Welt für das richtige Spiel fest, sie bleibt dann das ganze Spiel über. Los geht es wie gewohnt über „▶ Spielen\". Mit „Standard\" wechseln die Welten wie vorgesehen mit dem Score.": "fixes the world for your real games, it then stays for the whole run. You start as usual with \"▶ Play\". With \"Default\" the worlds change with your score again.",
+    "Tiefer Raum": "Deep Space",
+    "Eisplanet": "Ice Planet",
+    "Wüstenplanet": "Desert Planet",
+    "Smaragdwelt": "Emerald World",
+    "Gasriese": "Gas Giant",
+    "Vulkanwelt": "Volcano World",
+    "⚙️ Einstellungen": "⚙️ Settings",
+    "Sprache": "Language",
+    "Hintergrundmusik": "Background music",
+    "Jede Welt hat ihr eigenes Stück, jede neue Farbe macht es voller": "Every world has its own track, every new colour makes it fuller",
+    "Soundeffekte": "Sound effects",
+    "Sounds für Items, Sprengungen und Kollisionen": "Sounds for items, demolitions and collisions",
+    "An 🔊": "On 🔊",
+    "Aus 🔇": "Off 🔇",
+    "Farben": "Colours",
+    "Farbmodus": "Colour mode",
+    "Normalsicht": "Standard vision",
+    "Rot-Grün-Blindheit": "Red-green deficiency",
+    "Blau-Gelb-Blindheit": "Blue-yellow deficiency",
+    "Kugelfarben: Pink, Cyan, Gelb und Lila": "Ball colours: pink, cyan, yellow and purple",
+    "Kugelfarben: Blau, Grün, Weiß und Orange": "Ball colours: blue, green, white and orange",
+    "Kugelfarben: Rot, Grün, Weiß und Violett": "Ball colours: red, green, white and violet",
+    "Konto": "Account",
+    "Angemeldet": "Signed in",
+    "Abmelden": "Sign out",
+    "Konto löschen": "Delete account",
+    "Entfernt dein Konto und alle Daten endgültig": "Removes your account and all data permanently",
+    "Löschen": "Delete",
+    "Highscore sichern": "Save your highscore",
+    "Punkte ohne Konto": "points without an account",
+    "Nur auf diesem Gerät gespeichert": "Stored on this device only",
+    "Rechtliches": "Legal",
+    "Datenschutzerklärung": "Privacy policy",
+    "Welche Daten gespeichert werden": "Which data is stored",
+    "Daten löschen": "Delete data",
+    "Anleitung und Kontakt zur Löschung": "How to request deletion, and contact",
+    "Impressum": "Legal notice",
+    "Angaben gemäß § 5 TMG": "Provider information under § 5 TMG (German law)",
+    "Space Wheel enthält keine Werbung, keine In-App-Käufe und kein Tracking.": "Space Wheel contains no ads, no in-app purchases and no tracking.",
+    "Konto endgültig löschen?": "Delete account permanently?",
+    "Dauerhaft gelöscht werden dein Nutzername, dein Freundescode, dein Highscore sowie deine Freundesliste und offene Anfragen. Du verschwindest aus allen Bestenlisten.": "Permanently deleted are your username, your friend code, your highscore as well as your friends list and open requests. You disappear from every leaderboard.",
+    "Das lässt sich": "This can",
+    "nicht": "not",
+    "rückgängig machen. Auch der lokale Highscore auf diesem Gerät wird zurückgesetzt.": "be undone. The local highscore on this device is reset as well.",
+    "Gib zur Bestätigung dein Passwort ein:": "Enter your password to confirm:",
+    "Endgültig löschen": "Delete permanently",
+    "Wird gelöscht…": "Deleting…",
+    "Zu viele Versuche. Bitte später erneut versuchen.": "Too many attempts. Please try again later.",
+    "Serverseitig abgelehnt — bitte Firestore-Regeln prüfen.": "Rejected by the server — please check the Firestore rules.",
+    "Löschen fehlgeschlagen. Bitte erneut versuchen.": "Deletion failed. Please try again.",
+    "🏆 Neuer Highscore:": "🏆 New highscore:",
+    "Du spielst ohne Konto — dieser Rekord liegt nur auf diesem Gerät. Melde dich an, um ihn deinem Konto zuzuschreiben und in die Bestenliste zu kommen. Du kannst das auch später in den Einstellungen nachholen.": "You are playing without an account — this record stays on this device only. Sign in to attach it to your account and enter the leaderboard. You can also do that later in the settings.",
+    "Später": "Later",
+    "Highscore übernehmen?": "Adopt this highscore?",
+    "Auf diesem Gerät wurde ohne Konto ein Highscore von": "On this device a highscore of",
+    "erspielt.": "was played without an account.",
+    "Gehört dieser Rekord zu deinem Konto": "Does this record belong to your account",
+    "(aktuell": "(currently",
+    "Bei": "If you choose",
+    "Nein": "No",
+    "fragen wir erst wieder, wenn erneut ohne Konto gespielt wurde.": "we will only ask again after another run without an account.",
+    "Ja, übernehmen": "Yes, adopt it",
+    "☁ Highscore synchronisiert": "☁ Highscore synced",
+    "☁ Highscore übernommen: ": "☁ Highscore adopted: ",
+    "Der Highscore konnte nicht übertragen werden. ": "The highscore could not be transferred. ",
+    "Beim nächsten Anmelden fragen wir erneut.": "We will ask again the next time you sign in.",
+    "📡 <b>Offline</b> — du bist angemeldet, aber ohne Verbindung. ": "📡 <b>Offline</b> — you are signed in but have no connection. ",
+    "Dein Highscore wird auf dem Gerät gespeichert und automatisch mit deinem ": "Your highscore is stored on this device and synced with your ",
+    "Konto abgeglichen, sobald du wieder online bist.": "account automatically as soon as you are back online.",
+    "📡 <b>Offline</b> — du spielst ohne Konto. Dein Highscore wird ": "📡 <b>Offline</b> — you are playing without an account. Your highscore ",
+    "auf dem Gerät gespeichert. Melde dich später an, dann wird er deinem ": "is stored on this device. Sign in later and it will be credited ",
+    "Konto gutgeschrieben.": "to your account.",
+    "🧪 TESTRUNDE · ": "🧪 TEST ROUND · ",
+    "Stufe 1: ": "Level 1: ",
+    "Stufe 2: ": "Level 2: ",
+    "Stufe 6: ": "Level 6: ",
+    "Stufe 9: ": "Level 9: ",
+    " freigeschaltet! ": " unlocked! ",
+    " im Fokus ": " in focus ",
+    "Stufe 3: Tempo erhöht": "Level 3: Faster pace",
+    "Stufe 4: Zebra-Balken aktiv 🦓": "Level 4: Zebra bars active 🦓",
+    "Stufe 5: Dual-Gaps aktiv! 👥": "Level 5: Dual gaps active! 👥",
+    "Stufe 6: Tri-Color Einstieg 🌟": "Level 6: Three colours begin 🌟",
+    "Stufe 7: Tri-Color Highspeed ⚡": "Level 7: Three colours at speed ⚡",
+    "Stufe 8: TRIPLE-GAPS freigeschaltet! 👥⚡": "Level 8: TRIPLE GAPS unlocked! 👥⚡",
+    "🌟 IMMUNITY AKTIV": "🌟 IMMUNITY ACTIVE",
+    "⏳ ZEITLUPE AKTIV": "⏳ SLOW MOTION ACTIVE",
+    "💥 SPRENGUNG: noch ": "💥 DEMOLITION: ",
+    " Balken": " bars left",
+    "↔ BREITE LÜCKEN AKTIV": "↔ WIDE GAPS ACTIVE",
+    "🛡️ Schild abgelaufen": "🛡️ Shield expired",
+    "+1 Bombe ausgewichen! 💣": "+1 Bomb dodged! 💣",
+    "+1 Ausgewichen! 💨": "+1 Dodged! 💨",
+    "💥 +1 Gesprengt!": "💥 +1 Blasted!",
+    "🛡️ Schild verloren!": "🛡️ Shield lost!",
+    "🌟 STAR POWER! UNSTERBLICH!": "🌟 STAR POWER! INVINCIBLE!",
+    "Schild aktiv! 🛡️": "Shield active! 🛡️",
+    "🔀 FARBTAUSCH!": "🔀 COLOUR SWAP!",
+    "↔ BREITE LÜCKEN!": "↔ WIDE GAPS!",
+    "💥 SPRENGUNG!": "💥 DEMOLITION!",
+    "🔥 Triple Risky! +3 Bonus!": "🔥 Triple Risky! +3 bonus!",
+    "✨ MAGICAL RISKY! +10 Bonus!": "✨ MAGICAL RISKY! +10 bonus!",
+    "er RISKY-SERIE! +": "-RISKY STREAK! +",
+    " Bonus!": " bonus!",
+    "💥 Getroffen! Versuch's weiter": "💥 Hit! Keep trying",
+    "TESTRUNDE BEENDET": "TEST ROUND OVER",
+    " · zählt nicht zum Highscore": " · does not count towards the highscore",
+    "Berühren für neue Testrunde": "Tap for a new test round",
+    "Bildschirm berühren für Neustart": "Tap the screen to restart",
+    "Gelb": "Yellow",
+    "Lila": "Purple",
+    "Blau": "Blue",
+    "Grün": "Green",
+    "Weiß": "White",
+    "Rot": "Red",
+    "Violett": "Violet"
+};
+let sprache = localStorage.getItem('sw_lang');
+if (sprache !== 'de' && sprache !== 'en') {
+    sprache = String(navigator.language || 'de').toLowerCase().indexOf('de') === 0 ? 'de' : 'en';
+}
+function t(s) {
+    if (sprache !== 'en' || s == null) return s;
+    const k = String(s);
+    return TEXTE[k] !== undefined ? TEXTE[k] : k;
+}
+// Feste Texte im Markup übersetzen; der deutsche Urtext bleibt am Textknoten
+function uebersetzeDom() {
+    const lauf = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    const knoten = [];
+    while (lauf.nextNode()) knoten.push(lauf.currentNode);
+    for (const n of knoten) {
+        const eltern = n.parentNode;
+        if (!eltern || eltern.nodeName === 'SCRIPT' || eltern.nodeName === 'STYLE') continue;
+        if (n.__de === undefined) n.__de = n.nodeValue;
+        const roh = n.__de;
+        const kern = roh.trim().replace(/\s+/g, ' ');
+        if (!kern) continue;
+        if (sprache !== 'en') { if (n.nodeValue !== roh) n.nodeValue = roh; continue; }
+        const ziel = TEXTE[kern];
+        if (ziel === undefined) continue;
+        n.nodeValue = roh.match(/^\s*/)[0] + ziel + roh.match(/\s*$/)[0];
+    }
+    document.querySelectorAll('[placeholder]').forEach(el => {
+        if (el.__dePh === undefined) el.__dePh = el.getAttribute('placeholder');
+        el.setAttribute('placeholder', t(el.__dePh));
+    });
+    // Rechtliche Seiten gibt es in beiden Sprachen
+    document.querySelectorAll('a[href]').forEach(a => {
+        [['privacy-de.html', 'privacy-en.html'], ['impressum-de.html', 'impressum-en.html']].forEach(p => {
+            const von = sprache === 'en' ? p[0] : p[1];
+            const nach = sprache === 'en' ? p[1] : p[0];
+            if (a.getAttribute('href') === von) a.setAttribute('href', nach);
+        });
+    });
+    document.documentElement.lang = sprache;
+}
+function markiereSprache() {
+    document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.dataset.lang === sprache));
+}
+function chooseLanguage(l) {
+    sprache = (l === 'en') ? 'en' : 'de';
+    try { localStorage.setItem('sw_lang', sprache); } catch (e) {}
+    uebersetzeDom();
+    markiereSprache();
+    renderPaletteUI();
+    renderHelpBalls();
+    renderWorldsList();
+    updateMusicToggleLabel();
+    letzterStufenName = '';  // Stufenmeldung in der neuen Sprache zeigen
+    const tut = document.getElementById('tutorial-overlay');
+    if (tut && tut.style.display === 'block') renderTutorialSlide();
+}
+
 const HS_KEY = 'orbit_highscore_v46';
 const HS_OWNER_KEY = 'sw_hs_owner';       // Konto, zu dem der lokale Highscore gehört
 const HS_DECLINED_KEY = 'sw_hs_declined'; // abgelehnter Gast-Score, wird nicht erneut angeboten
@@ -739,7 +1060,7 @@ let COLOR_PURPLE = palette.colors[3]; // Kugel 4 - ab Score 125
 const COLOR_RAINBOW = 'RAINBOW';
 
 function ballColor(i) { return palette.colors[i]; }
-function ballName(i)  { return palette.names[i]; }
+function ballName(i)  { return t(palette.names[i]); }
 function ballDot(i)   { return palette.dots[i]; }
 function ballIndex(c) { return palette.colors.indexOf(c); }
 
@@ -913,25 +1234,25 @@ function resetGame() {
 
 function getLevelSettings(s) {
     if (s >= 125) {
-        return { speed: 490, name: 'Stufe 9: ' + ballName(3) + ' freigeschaltet! ' + ballDot(3), color: COLOR_PURPLE };
+        return { speed: 490, name: t('Stufe 9: ') + ballName(3) + t(' freigeschaltet! ') + ballDot(3), color: COLOR_PURPLE };
     } else if (s >= 90) {
-        return { speed: 440, name: "Stufe 8: TRIPLE-GAPS freigeschaltet! 👥⚡", color: "#00ffcc" };
+        return { speed: 440, name: t("Stufe 8: TRIPLE-GAPS freigeschaltet! 👥⚡"), color: "#00ffcc" };
     } else if (s >= 72) {
-        return { speed: 410, name: "Stufe 7: Tri-Color Highspeed ⚡", color: COLOR_YELLOW };
+        return { speed: 410, name: t("Stufe 7: Tri-Color Highspeed ⚡"), color: COLOR_YELLOW };
     } else if (s >= 51) {
         let local = s - 51;
-        if (local < 4) return { speed: 310, name: 'Stufe 6: ' + ballName(2) + ' freigeschaltet! ' + ballDot(2), color: COLOR_YELLOW };
-        return { speed: 350, name: "Stufe 6: Tri-Color Einstieg 🌟", color: COLOR_YELLOW };
+        if (local < 4) return { speed: 310, name: t('Stufe 6: ') + ballName(2) + t(' freigeschaltet! ') + ballDot(2), color: COLOR_YELLOW };
+        return { speed: 350, name: t("Stufe 6: Tri-Color Einstieg 🌟"), color: COLOR_YELLOW };
     } else if (s >= 41) {
-        return { speed: 380, name: "Stufe 5: Dual-Gaps aktiv! 👥", color: COLOR_PINK };
+        return { speed: 380, name: t("Stufe 5: Dual-Gaps aktiv! 👥"), color: COLOR_PINK };
     } else if (s >= 27) {
-        return { speed: 350, name: "Stufe 4: Zebra-Balken aktiv 🦓", color: COLOR_CYAN };
+        return { speed: 350, name: t("Stufe 4: Zebra-Balken aktiv 🦓"), color: COLOR_CYAN };
     } else if (s >= 20) {
-        return { speed: 320, name: "Stufe 3: Tempo erhöht", color: COLOR_CYAN };
+        return { speed: 320, name: t("Stufe 3: Tempo erhöht"), color: COLOR_CYAN };
     } else if (s >= 12) {
-        return { speed: 290, name: 'Stufe 2: ' + ballName(1) + ' freigeschaltet! ' + ballDot(1), color: COLOR_CYAN };
+        return { speed: 290, name: t('Stufe 2: ') + ballName(1) + t(' freigeschaltet! ') + ballDot(1), color: COLOR_CYAN };
     }
-    return { speed: 285, name: 'Stufe 1: ' + ballName(0) + ' im Fokus ' + ballDot(0), color: "#00ff66" };
+    return { speed: 285, name: t('Stufe 1: ') + ballName(0) + t(' im Fokus ') + ballDot(0), color: "#00ff66" };
 }
 
 function update() {
@@ -956,7 +1277,7 @@ function update() {
         shieldTimer = Math.max(0, shieldTimer - dt);
         if (shieldTimer === 0) {
             hasShield = false;
-            createFloatingText("🛡️ Schild abgelaufen", orbitX, orbitY - 50);
+            createFloatingText(t("🛡️ Schild abgelaufen"), orbitX, orbitY - 50);
         }
     } else {
         shieldTimer = 0;
@@ -975,13 +1296,13 @@ function update() {
     // Nur herunterzaehlen, wenn die Meldung auch sichtbar ist
     if (!itemAnzeige && levelBannerTimer > 0) levelBannerTimer = Math.max(0, levelBannerTimer - dt);
     if (starPowerTimer > 0) {
-        zeigeBanner('🌟 IMMUNITY AKTIV', COLOR_YELLOW);
+        zeigeBanner(t('🌟 IMMUNITY AKTIV'), COLOR_YELLOW);
     } else if (slowMotionTimer > 0) {
-        zeigeBanner('⏳ ZEITLUPE AKTIV', COLOR_CYAN);
+        zeigeBanner(t('⏳ ZEITLUPE AKTIV'), COLOR_CYAN);
     } else if (clearCharges > 0 || projectiles.length > 0) {
-        zeigeBanner('💥 SPRENGUNG: noch ' + (clearCharges + projectiles.length) + ' Balken', '#ff3300');
+        zeigeBanner(t('💥 SPRENGUNG: noch ') + (clearCharges + projectiles.length) + t(' Balken'), '#ff3300');
     } else if (wideGapTimer > 0) {
-        zeigeBanner('↔ BREITE LÜCKEN AKTIV', COLOR_PURPLE);
+        zeigeBanner(t('↔ BREITE LÜCKEN AKTIV'), COLOR_PURPLE);
     } else if (levelBannerTimer > 0) {
         zeigeBanner(settings.name, settings.color);
     } else {
@@ -1078,9 +1399,9 @@ function update() {
                 score += 1;
                 scoreEl.innerText = score;
                 if (obs.type === TYPE_BOMB) {
-                    createFloatingText("+1 Bombe ausgewichen! 💣", orbitX, orbitY - 50);
+                    createFloatingText(t("+1 Bombe ausgewichen! 💣"), orbitX, orbitY - 50);
                 } else {
-                    createFloatingText("+1 Ausgewichen! 💨", orbitX, orbitY - 50);
+                    createFloatingText(t("+1 Ausgewichen! 💨"), orbitX, orbitY - 50);
                 }
             }
         }
@@ -1103,7 +1424,7 @@ function update() {
                 obs.passed = true;
                 score += 1;
                 scoreEl.innerText = score;
-                createFloatingText("💥 +1 Gesprengt!", orbitX, orbitY - 50);
+                createFloatingText(t("💥 +1 Gesprengt!"), orbitX, orbitY - 50);
                 continue;
             }
 
@@ -1143,7 +1464,7 @@ function update() {
                         hasShield = false;
                         obs.passed = true;
                         playSfx('shield');
-                        createFloatingText("🛡️ Schild verloren!", orbitX, orbitY - 50);
+                        createFloatingText(t("🛡️ Schild verloren!"), orbitX, orbitY - 50);
                         triggerJuiceEffect('#ffffff');
                     } else {
                         for (let j = 0; j < 50; j++) {
@@ -1196,7 +1517,7 @@ function update() {
                         hasShield = false;
                         obs.passed = true;
                         playSfx('shield');
-                        createFloatingText("🛡️ Schild verloren!", orbitX, orbitY - 50);
+                        createFloatingText(t("🛡️ Schild verloren!"), orbitX, orbitY - 50);
                         triggerJuiceEffect('#ffffff');
                     } else {
                         triggerGameOver();
@@ -1232,7 +1553,7 @@ function update() {
                         hasShield = false;
                         obs.passed = true;
                         playSfx('shield');
-                        createFloatingText("🛡️ Schild verloren!", orbitX, orbitY - 50);
+                        createFloatingText(t("🛡️ Schild verloren!"), orbitX, orbitY - 50);
                         triggerJuiceEffect('#ffffff');
                     } else {
                         triggerGameOver();
@@ -1284,7 +1605,7 @@ function update() {
                         hasShield = false;
                         obs.passed = true;
                         playSfx('shield');
-                        createFloatingText("🛡️ Schild verloren!", orbitX, orbitY - 50);
+                        createFloatingText(t("🛡️ Schild verloren!"), orbitX, orbitY - 50);
                         triggerJuiceEffect('#ffffff');
                     } else {
                         triggerGameOver();
@@ -1318,14 +1639,14 @@ function activateItem(effect, itemColor) {
     playSfx('pickup');
     if (effect === ITEM_STAR) {
         starPowerTimer = 6.2;
-        createFloatingText("🌟 STAR POWER! UNSTERBLICH!", orbitX, orbitY - 50);
+        createFloatingText(t("🌟 STAR POWER! UNSTERBLICH!"), orbitX, orbitY - 50);
     } else if (effect === ITEM_SLOW) {
         slowMotionTimer = 5.2;
         createFloatingText("Zeitlupe! ⏳", orbitX, orbitY - 50);
     } else if (effect === ITEM_SHIELD) {
         hasShield = true;
         shieldTimer = 10.2;
-        createFloatingText("Schild aktiv! 🛡️", orbitX, orbitY - 50);
+        createFloatingText(t("Schild aktiv! 🛡️"), orbitX, orbitY - 50);
     } else if (effect === ITEM_SWAP) {
         // Gegenüberliegende Farben tauschen die Plätze (= 180°-Sprung des Rads)
         orbitAngle += Math.PI;
@@ -1333,17 +1654,17 @@ function activateItem(effect, itemColor) {
         // Reaktionszeit ist bereits eingeplant: beim Spawn eines Farbtausch-
         // Items bekommt der folgende Balken automatisch 0,5 s mehr Abstand
         // (siehe createObstacle)
-        createFloatingText("🔀 FARBTAUSCH!", orbitX, orbitY - 50);
+        createFloatingText(t("🔀 FARBTAUSCH!"), orbitX, orbitY - 50);
         [COLOR_PINK, COLOR_CYAN, COLOR_YELLOW, COLOR_PURPLE].forEach(c => triggerJuiceEffect(c));
     } else if (effect === ITEM_WIDEGAP) {
         wideGapTimer = 5.2;
-        createFloatingText("↔ BREITE LÜCKEN!", orbitX, orbitY - 50);
+        createFloatingText(t("↔ BREITE LÜCKEN!"), orbitX, orbitY - 50);
     } else if (effect === ITEM_CLEAR) {
         // Die einsammelnde Kugel schießt auf die nächsten 3 Balken, sobald
         // diese die Feldmitte erreichen (Ablauf im Update-Loop)
         clearCharges = 3;
         clearShooterColor = itemColor || COLOR_PINK;
-        createFloatingText("💥 SPRENGUNG!", orbitX, orbitY - 50);
+        createFloatingText(t("💥 SPRENGUNG!"), orbitX, orbitY - 50);
     }
 }
 
@@ -1409,7 +1730,7 @@ function explodeBar(obs) {
     playSfx('explode');
     score += 1;
     scoreEl.innerText = score;
-    createFloatingText("💥 +1 Gesprengt!", orbitX, orbitY - 50);
+    createFloatingText(t("💥 +1 Gesprengt!"), orbitX, orbitY - 50);
     for (let j = 0; j < 45; j++) {
         particles.push({
             x: Math.random() * canvas.width,
@@ -1437,11 +1758,11 @@ function awardPoints(closestDist, color) {
             score += streakBonus;
             scoreEl.innerText = score;
             if (perfectStreak === 3) {
-                createFloatingText("🔥 Triple Risky! +3 Bonus!", orbitX, orbitY - 80);
+                createFloatingText(t("🔥 Triple Risky! +3 Bonus!"), orbitX, orbitY - 80);
             } else if (perfectStreak === 10) {
-                createFloatingText("✨ MAGICAL RISKY! +10 Bonus!", orbitX, orbitY - 80);
+                createFloatingText(t("✨ MAGICAL RISKY! +10 Bonus!"), orbitX, orbitY - 80);
             } else {
-                createFloatingText("🚀 " + perfectStreak + "er RISKY-SERIE! +" + streakBonus + " Bonus!", orbitX, orbitY - 80);
+                createFloatingText("🚀 " + perfectStreak + t("er RISKY-SERIE! +") + streakBonus + t(" Bonus!"), orbitX, orbitY - 80);
             }
         }
 
@@ -1711,7 +2032,7 @@ function triggerGameOver(cause) {
         // Im Tutorial-Test kein echtes Game Over: Feld leeren und weiterprobieren
         obstacles = []; items = [];
         spawnTimer = 9999;
-        createFloatingText("💥 Getroffen! Versuch's weiter", orbitX, orbitY - 50);
+        createFloatingText(t("💥 Getroffen! Versuch's weiter"), orbitX, orbitY - 50);
         return;
     }
     gameOver = true; isDragging = false;
@@ -2460,7 +2781,7 @@ function updateWorld(dt) {
         lavaBombs = [];
         craterFlash = 0;
         eruptionTimer = 1.2;
-        createFloatingText('🪐 ' + w.name, orbitX, orbitY - 110);
+        createFloatingText('🪐 ' + t(w.name), orbitX, orbitY - 110);
     }
     if (currentWorld.decor === 'volcano') {
         if (!volcanoCraters.length) volcanoCraters = volcanoCraterPositions();
@@ -2786,15 +3107,15 @@ function draw() {
         ctx.fillStyle = 'rgba(10, 10, 15, 0.92)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = '#ffffff'; ctx.font = 'bold 24px Segoe UI'; ctx.textAlign = 'center';
         if (forcedWorld) {
-            ctx.fillText('TESTRUNDE BEENDET', canvas.width / 2, canvas.height / 2 - 40);
+            ctx.fillText(t('TESTRUNDE BEENDET'), canvas.width / 2, canvas.height / 2 - 40);
             ctx.fillStyle = '#ffcc00'; ctx.font = '16px Segoe UI';
-            ctx.fillText('Score ' + score + ' · zählt nicht zum Highscore', canvas.width / 2, canvas.height / 2 - 8);
+            ctx.fillText('Score ' + score + t(' · zählt nicht zum Highscore'), canvas.width / 2, canvas.height / 2 - 8);
             ctx.fillStyle = '#45f3ff'; ctx.font = '18px Segoe UI';
-            ctx.fillText('Berühren für neue Testrunde', canvas.width / 2, canvas.height / 2 + 30);
+            ctx.fillText(t('Berühren für neue Testrunde'), canvas.width / 2, canvas.height / 2 + 30);
         } else {
             ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 20);
             ctx.fillStyle = '#45f3ff'; ctx.font = '18px Segoe UI';
-            ctx.fillText('Bildschirm berühren für Neustart', canvas.width / 2, canvas.height / 2 + 20);
+            ctx.fillText(t('Bildschirm berühren für Neustart'), canvas.width / 2, canvas.height / 2 + 20);
         }
     }
 }
@@ -2898,13 +3219,13 @@ function renderHelpBalls() {
         const sym = palette.symbols ? ' · Symbol: ' + GLYPH_NAMEN[i] : '';
         return '<div class="help-item">'
             + '<div class="help-icon" style="color:' + c + ';">●</div>'
-            + '<div><div class="help-name">' + palette.names[i] + ' – ' + BALL_SCHWELLEN[i] + '</div>'
-            + '<div class="help-desc">' + BALL_BESCHREIBUNG[i] + sym + '</div></div>'
+            + '<div><div class="help-name">' + ballName(i) + ' – ' + t(BALL_SCHWELLEN[i]) + '</div>'
+            + '<div class="help-desc">' + t(BALL_BESCHREIBUNG[i]) + sym + '</div></div>'
             + '</div>';
     }).join('');
     const swap = document.getElementById('help-swap-desc');
-    if (swap) swap.textContent = 'Gegenüberliegende Kugeln tauschen sofort die Plätze: '
-        + ballName(0) + ' ⇄ ' + ballName(1) + ' und ' + ballName(2) + ' ⇄ ' + ballName(3) + '. Schnell umdenken!';
+    if (swap) swap.textContent = t('Gegenüberliegende Kugeln tauschen sofort die Plätze: ')
+        + ballName(0) + ' ⇄ ' + ballName(1) + t(' und ') + ballName(2) + ' ⇄ ' + ballName(3) + t('. Schnell umdenken!');
 }
 function openHelp() {
     renderHelpBalls();
@@ -2933,8 +3254,8 @@ function startPlayFromMenu() {
 function maybeAskTutorial() {
     markTutorialAsked();
     document.getElementById('ask-icon').textContent = '📖';
-    document.getElementById('ask-title').textContent = 'Tutorial spielen?';
-    document.getElementById('ask-text').textContent = 'Willkommen bei Space Wheel! Möchtest du zuerst das Tutorial ansehen? Es erklärt dir Steuerung, Balken und Items Schritt für Schritt.';
+    document.getElementById('ask-title').textContent = t('Tutorial spielen?');
+    document.getElementById('ask-text').textContent = t('Willkommen bei Space Wheel! Möchtest du zuerst das Tutorial ansehen? Es erklärt dir Steuerung, Balken und Items Schritt für Schritt.');
     document.getElementById('ask-buttons').innerHTML =
         '<button class="ask-secondary" onclick="tutorialAskNo()">Nein, danke</button>' +
         '<button class="tut-next" onclick="tutorialAskYes()">Ja, gerne!</button>';
@@ -2955,8 +3276,8 @@ function tutorialAskYes() {
 }
 function tutorialAskNo() {
     document.getElementById('ask-icon').textContent = '👍';
-    document.getElementById('ask-title').textContent = 'Alles klar!';
-    document.getElementById('ask-text').textContent = 'Du kannst dir das Tutorial jederzeit im Menü unter „📖 Tutorial" noch einmal anschauen und spielen.';
+    document.getElementById('ask-title').textContent = t('Alles klar!');
+    document.getElementById('ask-text').textContent = t('Du kannst dir das Tutorial jederzeit im Menü unter „📖 Tutorial" noch einmal anschauen und spielen.');
     document.getElementById('ask-buttons').innerHTML =
         '<button class="tut-next" onclick="tutorialAskClose()">OK</button>';
 }
@@ -3003,7 +3324,7 @@ function openDeleteAccount() {
     document.getElementById('delete-pw').value = '';
     document.getElementById('delete-error').textContent = '';
     const btn = document.getElementById('delete-confirm-btn');
-    btn.disabled = false; btn.textContent = 'Endgültig löschen';
+    btn.disabled = false; btn.textContent = t('Endgültig löschen');
     document.getElementById('delete-account-modal').classList.add('active');
 }
 
@@ -3016,11 +3337,11 @@ async function confirmDeleteAccount() {
     const btn = document.getElementById('delete-confirm-btn');
     const pw = document.getElementById('delete-pw').value;
     errEl.textContent = '';
-    if (!pw) { errEl.textContent = 'Bitte Passwort eingeben'; return; }
-    if (!fbUser || !fbUserData) { errEl.textContent = 'Nicht angemeldet'; return; }
+    if (!pw) { errEl.textContent = t('Bitte Passwort eingeben'); return; }
+    if (!fbUser || !fbUserData) { errEl.textContent = t('Nicht angemeldet'); return; }
     if (!navigator.onLine) { errEl.textContent = 'Keine Internetverbindung'; return; }
 
-    btn.disabled = true; btn.textContent = 'Wird gelöscht…';
+    btn.disabled = true; btn.textContent = t('Wird gelöscht…');
     const uid = fbUser.uid;
     const uname = (fbUserData.username || '').toLowerCase();
     const fcode = fbUserData.friendCode;
@@ -3056,15 +3377,15 @@ async function confirmDeleteAccount() {
     } catch (e) {
         const code = e && e.code;
         if (code === 'auth/wrong-password' || code === 'auth/invalid-credential' || code === 'auth/invalid-login-credentials') {
-            errEl.textContent = 'Falsches Passwort';
+            errEl.textContent = t('Falsches Passwort');
         } else if (code === 'auth/too-many-requests') {
-            errEl.textContent = 'Zu viele Versuche. Bitte später erneut versuchen.';
+            errEl.textContent = t('Zu viele Versuche. Bitte später erneut versuchen.');
         } else if (code === 'permission-denied') {
-            errEl.textContent = 'Serverseitig abgelehnt — bitte Firestore-Regeln prüfen.';
+            errEl.textContent = t('Serverseitig abgelehnt — bitte Firestore-Regeln prüfen.');
         } else {
-            errEl.textContent = 'Löschen fehlgeschlagen. Bitte erneut versuchen.';
+            errEl.textContent = t('Löschen fehlgeschlagen. Bitte erneut versuchen.');
         }
-        btn.disabled = false; btn.textContent = 'Endgültig löschen';
+        btn.disabled = false; btn.textContent = t('Endgültig löschen');
     }
 }
 
@@ -3082,13 +3403,13 @@ function renderWorldsList() {
         '<div class="world-text"><div class="help-name">' + name + '</div>' +
         '<div class="help-desc">' + desc + '</div></div>' +
         '<div class="world-actions">' +
-        (testIndex != null ? '<button class="world-btn" onclick="playWorld(' + testIndex + ')">Testen</button>' : '') +
-        (aktiv ? '<button class="world-btn primary">✓ Aktiv</button>'
-               : '<button class="world-btn" onclick="chooseWorld(' + wahl + ')">Übernehmen</button>') +
+        (testIndex != null ? '<button class="world-btn" onclick="playWorld(' + testIndex + ')">' + t('Testen') + '</button>' : '') +
+        (aktiv ? '<button class="world-btn primary">' + t('✓ Aktiv') + '</button>'
+               : '<button class="world-btn" onclick="chooseWorld(' + wahl + ')">' + t('Übernehmen') + '</button>') +
         '</div></div>';
     document.getElementById('worlds-list').innerHTML =
-        zeile('🔄', 'Standard', 'Welten wechseln mit dem Score', !chosenWorld, null, -1) +
-        WORLDS.map((w, i) => zeile(w.icon, w.name, 'ab Score ' + w.minScore, chosenWorld === w, i, i)).join('');
+        zeile('🔄', t('Standard'), t('Welten wechseln mit dem Score'), !chosenWorld, null, -1) +
+        WORLDS.map((w, i) => zeile(w.icon, t(w.name), t('ab Score ') + w.minScore, chosenWorld === w, i, i)).join('');
 }
 function closeWorlds() {
     document.getElementById('worlds-screen').classList.remove('active');
@@ -3120,6 +3441,7 @@ function updateTestHud() {
 
 // ── Einstellungen ───────────────────────────────────────────
 function openSettings() {
+    markiereSprache();
     document.getElementById('settings-screen').classList.add('active');
     document.getElementById('hamburger-btn').style.display = 'none';
     gamePaused = true;
@@ -3142,7 +3464,7 @@ function renderPaletteUI() {
         b.classList.toggle('active', b.dataset.palette === paletteMode);
     });
     const hint = document.getElementById('palette-hint');
-    if (hint) hint.textContent = palette.hint;
+    if (hint) hint.textContent = t(palette.hint);
     const prev = document.getElementById('palette-preview');
     if (!prev) return;
     prev.innerHTML = '';
@@ -3153,7 +3475,7 @@ function renderPaletteUI() {
         g.fillStyle = c;
         g.beginPath(); g.arc(17, 17, 13, 0, Math.PI * 2); g.fill();
         if (palette.symbols) drawBallGlyph(g, i, 17, 17, 13, glyphInk(c));
-        cv.title = palette.names[i];
+        cv.title = ballName(i);
         prev.appendChild(cv);
     });
 }
@@ -3788,10 +4110,10 @@ function toggleSfx() {
 
 function updateMusicToggleLabel() {
     const b = document.getElementById('music-toggle-btn');
-    b.textContent = musicEnabled ? 'An 🔊' : 'Aus 🔇';
+    b.textContent = musicEnabled ? t('An 🔊') : t('Aus 🔇');
     b.style.background = musicEnabled ? '#ff007f' : '#2a2b3d';
     const sb = document.getElementById('sfx-toggle-btn');
-    sb.textContent = sfxEnabled ? 'An 🔊' : 'Aus 🔇';
+    sb.textContent = sfxEnabled ? t('An 🔊') : t('Aus 🔇');
     sb.style.background = sfxEnabled ? '#ff007f' : '#2a2b3d';
 }
 
@@ -3955,10 +4277,10 @@ function renderTutorialSlide() {
     const tutIcon = document.getElementById('tut-icon');
     tutIcon.textContent = (slide.iconBall != null) ? ballDot(slide.iconBall) : slide.icon;
     tutIcon.style.color = (slide.iconBall != null) ? ballColor(slide.iconBall) : '';
-    document.getElementById('tut-title').textContent = fillBallNames(slide.title);
-    document.getElementById('tut-text').textContent = fillBallNames(slide.text);
+    document.getElementById('tut-title').textContent = fillBallNames(t(slide.title));
+    document.getElementById('tut-text').textContent = fillBallNames(t(slide.text));
     const isLast = tutorialStep === TUTORIAL_SLIDES.length - 1;
-    document.getElementById('tut-next-btn').textContent = isLast ? 'Fertig ✓' : 'Weiter →';
+    document.getElementById('tut-next-btn').textContent = isLast ? t('Fertig ✓') : t('Weiter →');
     document.getElementById('tut-back-btn').style.visibility = tutorialStep === 0 ? 'hidden' : 'visible';
     document.getElementById('tut-try-btn').style.display = slide.test ? 'block' : 'none';
     const dots = document.getElementById('tut-dots');
@@ -3972,7 +4294,7 @@ function switchAuthTab(mode) {
     document.querySelectorAll('.auth-tab').forEach((t, i) => {
         t.classList.toggle('active', (i === 0) === (mode === 'login'));
     });
-    document.getElementById('auth-submit').textContent = mode === 'login' ? 'Anmelden' : 'Registrieren';
+    document.getElementById('auth-submit').textContent = mode === 'login' ? t('Anmelden') : t('Registrieren');
     document.getElementById('auth-error').textContent = '';
 }
 
@@ -3982,9 +4304,9 @@ async function handleAuth() {
     const password = document.getElementById('auth-password').value;
     const errEl = document.getElementById('auth-error');
     errEl.textContent = '';
-    if (!username || !password) { errEl.textContent = 'Bitte alle Felder ausfüllen'; return; }
-    if (username.length < 3) { errEl.textContent = 'Nutzername mind. 3 Zeichen'; return; }
-    if (password.length < 6) { errEl.textContent = 'Passwort mind. 6 Zeichen'; return; }
+    if (!username || !password) { errEl.textContent = t('Bitte alle Felder ausfüllen'); return; }
+    if (username.length < 3) { errEl.textContent = t('Nutzername mind. 3 Zeichen'); return; }
+    if (password.length < 6) { errEl.textContent = t('Passwort mind. 6 Zeichen'); return; }
     btn.disabled = true; btn.textContent = '...';
     try {
         if (authMode === 'register') await registerUser(username, password);
@@ -3992,7 +4314,7 @@ async function handleAuth() {
     } catch (e) {
         errEl.textContent = e.message;
         btn.disabled = false;
-        btn.textContent = authMode === 'login' ? 'Anmelden' : 'Registrieren';
+        btn.textContent = authMode === 'login' ? t('Anmelden') : t('Registrieren');
     }
 }
 
@@ -4007,10 +4329,10 @@ async function registerUser(username, password) {
     if (!/^[a-zA-Z0-9_]{3,20}$/.test(username))
         throw new Error('Nur Buchstaben, Zahlen, _ (3–20 Zeichen)');
     const usernameDoc = await fbDb.collection('usernames').doc(username.toLowerCase()).get();
-    if (usernameDoc.exists) throw new Error('Nutzername bereits vergeben');
+    if (usernameDoc.exists) throw new Error(t('Nutzername bereits vergeben'));
     const email = username.toLowerCase() + '@orbit-sync.app';
     const cred = await fbAuth.createUserWithEmailAndPassword(email, password).catch(e => {
-        if (e.code === 'auth/weak-password') throw new Error('Passwort zu schwach (mind. 6 Zeichen)');
+        if (e.code === 'auth/weak-password') throw new Error(t('Passwort zu schwach (mind. 6 Zeichen)'));
         throw new Error('Registrierung fehlgeschlagen');
     });
     const uid = cred.user.uid;
@@ -4030,7 +4352,7 @@ async function registerUser(username, password) {
 async function loginUser(username, password) {
     const email = username.toLowerCase() + '@orbit-sync.app';
     await fbAuth.signInWithEmailAndPassword(email, password).catch(() => {
-        throw new Error('Nutzername oder Passwort falsch');
+        throw new Error(t('Nutzername oder Passwort falsch'));
     });
 }
 
@@ -4106,10 +4428,10 @@ async function guestSyncYes() {
         localStorage.setItem(HS_KEY, score);
         localStorage.setItem(HS_OWNER_KEY, fbUser.uid);
         localStorage.removeItem(HS_DECLINED_KEY);
-        createFloatingText('☁ Highscore übernommen: ' + score, orbitX, orbitY - 110);
+        createFloatingText(t('☁ Highscore übernommen: ') + score, orbitX, orbitY - 110);
     } catch (e) {
-        showOfflineNote('Der Highscore konnte nicht übertragen werden. '
-            + 'Beim nächsten Anmelden fragen wir erneut.');
+        showOfflineNote(t('Der Highscore konnte nicht übertragen werden. ')
+            + t('Beim nächsten Anmelden fragen wir erneut.'));
     }
 }
 
@@ -4138,7 +4460,7 @@ async function trySyncHighscore() {
         if (owner === fbUser.uid && localHs > (fbUserData.highscore || 0)) {
             await fbDb.collection('users').doc(fbUser.uid).update({ highscore: localHs });
             fbUserData.highscore = localHs;
-            createFloatingText('☁ Highscore synchronisiert', orbitX, orbitY - 110);
+            createFloatingText(t('☁ Highscore synchronisiert'), orbitX, orbitY - 110);
         }
     } catch (e) {
         // Verbindung noch nicht stabil — nächster Versuch beim nächsten Ereignis
@@ -4202,7 +4524,7 @@ function escapeHtml(s) {
 async function renderLeaderboard(tab) {
     const listEl = document.getElementById('lb-list');
     if (!firebaseReady || !navigator.onLine) {
-        listEl.innerHTML = '<div style="text-align:center;color:#555;padding:40px;">📡 Keine Internetverbindung<br><br>Die Bestenliste ist offline nicht verfügbar. Dein Highscore wird lokal gespeichert und später synchronisiert.</div>';
+        listEl.innerHTML = t('<div style="text-align:center;color:#555;padding:40px;">📡 Keine Internetverbindung<br><br>Die Bestenliste ist offline nicht verfügbar. Dein Highscore wird lokal gespeichert und später synchronisiert.</div>');
         return;
     }
     listEl.innerHTML = '<div style="text-align:center;color:#555;padding:40px;">Laden...</div>';
@@ -4215,7 +4537,7 @@ async function renderLeaderboard(tab) {
             rows = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
         } else {
             if (!fbUser) {
-                listEl.innerHTML = '<div style="text-align:center;color:#555;padding:40px;">Melde dich an, um Freunde zu sehen</div>';
+                listEl.innerHTML = t('<div style="text-align:center;color:#555;padding:40px;">Melde dich an, um Freunde zu sehen</div>');
                 return;
             }
 
@@ -4240,7 +4562,7 @@ async function renderLeaderboard(tab) {
                             </div>
                         </div>`).join('')}
                     </div>
-                    <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;padding:0 4px;">Freunde</div>`;
+                    <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;padding:0 4px;">${t('Freunde')}</div>`;
                 }
             }
 
@@ -4261,14 +4583,14 @@ async function renderLeaderboard(tab) {
             const rank = medals[i] || `#${i+1}`;
             return `<div class="lb-row${isMe?' me':''}">
                 <div class="lb-rank">${rank}</div>
-                <div class="lb-name">${escapeHtml(r.username||'?')}${isMe?' <span style="color:#ff007f;font-size:11px;">(du)</span>':''}</div>
+                <div class="lb-name">${escapeHtml(r.username||'?')}${isMe?' <span style="color:#ff007f;font-size:11px;">' + t('(du)') + '</span>':''}</div>
                 <div class="lb-score">${r.highscore||0}</div>
             </div>`;
-        }).join('') : (tab === 'friends' ? '<div style="text-align:center;color:#555;padding:20px;">Noch keine Freunde</div>' : '<div style="text-align:center;color:#555;padding:40px;">Noch keine Einträge</div>');
+        }).join('') : (tab === 'friends' ? t('<div style="text-align:center;color:#555;padding:20px;">Noch keine Freunde</div>') : t('<div style="text-align:center;color:#555;padding:40px;">Noch keine Einträge</div>'));
 
         listEl.innerHTML = pendingHtml + rowsHtml;
     } catch(e) {
-        listEl.innerHTML = '<div style="text-align:center;color:#ff5555;padding:40px;">Fehler beim Laden</div>';
+        listEl.innerHTML = t('<div style="text-align:center;color:#ff5555;padding:40px;">Fehler beim Laden</div>');
     }
 }
 
@@ -4321,7 +4643,7 @@ async function handleAddFriend() {
     const errEl = document.getElementById('add-friend-error');
     errEl.textContent = '';
     errEl.style.color = '#ff3366';
-    if (!input) { errEl.textContent = 'Bitte Code oder Nutzernamen eingeben'; return; }
+    if (!input) { errEl.textContent = t('Bitte Code oder Nutzernamen eingeben'); return; }
     try {
         let targetUid = null;
         const codeSnap = await fbDb.collection('friendCodes').doc(input.toUpperCase()).get();
@@ -4331,8 +4653,8 @@ async function handleAddFriend() {
             const unameSnap = await fbDb.collection('usernames').doc(input.toLowerCase()).get();
             if (unameSnap.exists) targetUid = unameSnap.data().uid;
         }
-        if (!targetUid) throw new Error('Nicht gefunden');
-        if (targetUid === fbUser.uid) throw new Error('Du kannst dich nicht selbst hinzufügen');
+        if (!targetUid) throw new Error(t('Nicht gefunden'));
+        if (targetUid === fbUser.uid) throw new Error(t('Du kannst dich nicht selbst hinzufügen'));
 
         // Eigenen Stand frisch vom Server laden. Die lokale Kopie kann veraltet
         // sein (z. B. parallel auf einem anderen Gerät gespielt), und die
@@ -4351,14 +4673,14 @@ async function handleAddFriend() {
         if (myPending.includes(targetUid)) {
             await acceptFriendRequest(targetUid);
             errEl.style.color = '#00d68f';
-            errEl.textContent = 'Freund hinzugefügt!';
+            errEl.textContent = t('Freund hinzugefügt!');
             setTimeout(async () => { closeAddFriend(); await renderLeaderboard('friends'); }, 1500);
             return;
         }
 
         // Check if we already sent a request
         const targetDoc = await fbDb.collection('users').doc(targetUid).get();
-        if (!targetDoc.exists) throw new Error('Nicht gefunden');
+        if (!targetDoc.exists) throw new Error(t('Nicht gefunden'));
         const targetData = targetDoc.data();
         if ((targetData.pendingRequests||[]).includes(fbUser.uid))
             throw new Error('Anfrage bereits gesendet');
@@ -4408,9 +4730,9 @@ fbAuth.onAuthStateChanged(async (user) => {
             openHamburger();
         }
         if (offline) {
-            showOfflineNote('📡 <b>Offline</b> — du bist angemeldet, aber ohne Verbindung. '
-                + 'Dein Highscore wird auf dem Gerät gespeichert und automatisch mit deinem '
-                + 'Konto abgeglichen, sobald du wieder online bist.');
+            showOfflineNote(t('📡 <b>Offline</b> — du bist angemeldet, aber ohne Verbindung. ')
+                + t('Dein Highscore wird auf dem Gerät gespeichert und automatisch mit deinem ')
+                + t('Konto abgeglichen, sobald du wieder online bist.'));
         } else {
             showGuestSyncAsk();
         }
@@ -4422,9 +4744,9 @@ fbAuth.onAuthStateChanged(async (user) => {
             // Das Menü bleibt jederzeit über ☰ erreichbar.
             isGuest = true;
             showScreen(null);
-            showOfflineNote('📡 <b>Offline</b> — du spielst ohne Konto. Dein Highscore wird '
-                + 'auf dem Gerät gespeichert. Melde dich später an, dann wird er deinem '
-                + 'Konto gutgeschrieben.');
+            showOfflineNote(t('📡 <b>Offline</b> — du spielst ohne Konto. Dein Highscore wird ')
+                + t('auf dem Gerät gespeichert. Melde dich später an, dann wird er deinem ')
+                + t('Konto gutgeschrieben.'));
         }
         if (!isGuest) showScreen('auth-screen');
     }
@@ -4433,6 +4755,10 @@ fbAuth.onAuthStateChanged(async (user) => {
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js');
 }
+
+// Beim Laden die gespeicherte Sprache anwenden
+uebersetzeDom();
+markiereSprache();
 </script>
 </body>
 </html>
