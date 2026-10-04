@@ -66,8 +66,6 @@ Same assets as the German listing — the graphics carry no text:
 
 - App icon (512×512): `icon-512.png`
 - Feature graphic (1024×500, JPEG without alpha channel): `store/feature-graphic.jpg`
-- Screenshots (1080×1920): `store/screenshots/`
+- Screenshots (1080×1920): `store/screenshots-en/` (English interface)
 
-Note: the screenshots show the German interface. Once the app ships in English,
-take a second set with the language set to English and upload those under the
-English listing.
+Note: these eight screenshots were taken with the interface set to English. The German set under `store/screenshots/` belongs to the German listing.
